@@ -21,7 +21,7 @@ export default function App() {
         aria-hidden
       />
       <div
-        className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-b from-[#3b82f6]/12 via-transparent to-transparent opacity-90"
+        className="pointer-events-none fixed inset-0 -z-10 bg-linear-to-b from-[#3b82f6]/12 via-transparent to-transparent opacity-90"
         aria-hidden
       />
       <Navbar />

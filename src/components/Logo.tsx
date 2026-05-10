@@ -16,7 +16,7 @@ export function Logo({ className, showWordmark = true, compact = false }: LogoPr
         decoding="async"
         className={cn(
           'shrink-0 object-contain object-left',
-          compact ? 'h-8 w-auto max-h-8' : 'h-9 w-auto max-h-9 sm:h-10 sm:max-h-10',
+          compact ? 'h-8 w-auto max-h-8 rounded-full' : 'h-9 w-auto max-h-9 sm:h-10 sm:max-h-10 rounded-full',
         )}
       />
       {showWordmark && (

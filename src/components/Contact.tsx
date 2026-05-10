@@ -18,7 +18,7 @@ export default function Contact() {
           transition={{ duration: 0.5 }}
           className="mx-auto max-w-4xl"
         >
-          <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/15 via-card/80 to-card/40 p-[1px] shadow-2xl">
+          <Card className="overflow-hidden border-primary/25 bg-linear-to-br from-primary/15 via-card/80 to-card/40 p-px shadow-2xl">
             <CardContent className="relative rounded-xl bg-background/95 px-8 py-14 text-center md:px-16 md:py-20">
               <div
                 className="pointer-events-none absolute -top-32 -left-24 size-72 rounded-full bg-primary/20 blur-3xl"
