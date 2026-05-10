@@ -9,16 +9,16 @@ type ProjectCopy = { title: string; category: string; desc: string };
 
 const PROJECT_ASSETS = [
   {
-    tech: ['React', 'Next.js', 'PostgreSQL'],
-    img: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=1200&q=80',
+    tech: ['Framer Motion', 'Next JS', 'PostgreSQL'],
+    img: '/oson-uy.png',
   },
   {
-    tech: ['TypeScript', 'D3.js', 'Node.js'],
-    img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1200&q=80',
+    tech: ['Next JS', 'Nest JS', 'PostgreSQL'],
+    img: '/dashboard.png',
   },
   {
-    tech: ['Tailwind', 'Shopify', 'React'],
-    img: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?auto=format&fit=crop&w=1200&q=80',
+    tech: ['Next JS', 'PostgreSQL', 'Prisma'],
+    img: '/kidscity.png',
   },
 ] as const;
 
