@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export default function Contact() {
   const { t } = useTranslation();
 
-  const telegramLink = "https://t.me/Djamolov_Sardor";
+  const telegramLink = "https://t.me/sardor_danila_systems";
   const instagramLink = "https://www.instagram.com/sardor_danila_systems/";
   const phoneNumber = "tel:+998883928811";
   return (
