@@ -8,6 +8,9 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function Contact() {
   const { t } = useTranslation();
 
+  const telegramLink = 'https://t.me/sardor_system_solutions';
+  const instagramLink = 'https://www.instagram.com/sardor_danila_systems/';
+  const phoneNumber = 'tel:+998883928811';
   return (
     <section id="contact" className="scroll-mt-24 py-24 lg:pb-32">
       <div className="container mx-auto px-6">
@@ -36,15 +39,15 @@ export default function Contact() {
                 <p className="mx-auto mb-10 max-w-xl text-lg text-muted-foreground">{t('contact.subtitle')}</p>
 
                 <div className="flex flex-wrap justify-center gap-3">
-                  <Button size="lg" className="h-11 rounded-xl px-6 font-semibold">
+                  <Button onClick={() => {}} size="lg" className="h-11 rounded-xl px-6 font-semibold">
                     <Send className="size-4" />
                     {t('contact.telegram')}
                   </Button>
-                  <Button variant="outline" size="lg" className="h-11 rounded-xl border-border/80 px-6 font-semibold">
+                  <Button onClick={() => {}} variant="outline" size="lg" className="h-11 rounded-xl border-border/80 px-6 font-semibold">
                     <Instagram className="size-4" />
                     {t('contact.instagram')}
                   </Button>
-                  <Button variant="outline" size="lg" className="h-11 rounded-xl border-border/80 px-6 font-semibold">
+                  <Button onClick={() => {}} variant="outline" size="lg" className="h-11 rounded-xl border-border/80 px-6 font-semibold">
                     <Mail className="size-4" />
                     {t('contact.email')}
                   </Button>

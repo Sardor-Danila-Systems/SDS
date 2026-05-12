@@ -34,7 +34,7 @@ export default function Hero() {
   return (
     <section
       ref={sectionRef}
-      className="relative -mt-px overflow-x-clip pt-28 pb-16 lg:min-h-[min(90vh,920px)] lg:pt-40 lg:pb-28"
+      className="relative -mt-px overflow-x-clip pt-28 pb-16 lg:min-h-[min(90vh,920px)] lg:pb-28"
     >
       <div className="pointer-events-none absolute -top-px right-0 bottom-0 left-0 z-0 overflow-hidden">
         <MuxPlayer
@@ -60,7 +60,7 @@ export default function Hero() {
         />
       </div>
       <div
-        className="pointer-events-none absolute -top-px right-0 bottom-0 left-0 z-[1] bg-linear-to-b from-[#0f172a]/42 via-[#0f172a]/28 to-[#0f172a]/48"
+        className="pointer-events-none absolute -top-px right-0 bottom-0 left-0 z-1 bg-linear-to-b from-[#0f172a]/42 via-[#0f172a]/28 to-[#0f172a]/48"
         aria-hidden
       />
 
