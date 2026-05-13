@@ -54,7 +54,7 @@ export default function Technologies() {
             <motion.span
               key={tech}
               variants={item}
-              className="font-heading text-xl font-semibold tracking-tight whitespace-nowrap text-foreground"
+              className="font-heading cursor-pointer text-xl font-semibold tracking-tight whitespace-nowrap text-foreground"
             >
               {tech}
             </motion.span>
