@@ -26,8 +26,8 @@ export function Logo({ className, showWordmark = true, compact = false }: LogoPr
             compact ? 'text-[0.9375rem]' : 'text-base sm:text-lg',
           )}
         >
-          Sardor System
-          <span className="font-medium text-muted-foreground"> Solutions</span>
+          Sardor & Danila
+          <span className="font-medium text-muted-foreground"> Systems</span>
         </span>
       )}
     </span>
