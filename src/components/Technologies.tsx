@@ -5,11 +5,11 @@ const TECHS = [
   'React',
   'Next.js',
   'TypeScript',
-  'Node.js',
+  'Expo',
   'PostgreSQL',
   'Tailwind CSS',
-  'Flutter',
-  'Docker',
+  'React Native',
+  'Nest.js',
 ] as const;
 
 const list = {
@@ -20,9 +20,8 @@ const list = {
 };
 
 const item = {
-  hidden: { opacity: 0.35, y: 10 },
+  hidden: { y: 10 },
   show: {
-    opacity: 1,
     y: 0,
     transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] },
   },
@@ -44,7 +43,7 @@ export default function Technologies() {
           {t('technologies.label')}
         </motion.p>
         <motion.div
-          className="flex flex-wrap justify-center gap-x-10 gap-y-6 opacity-55 transition-opacity duration-500 hover:opacity-100"
+          className="flex flex-wrap justify-center gap-x-10 gap-y-6 group"
           variants={list}
           initial="hidden"
           whileInView="show"
@@ -54,7 +53,7 @@ export default function Technologies() {
             <motion.span
               key={tech}
               variants={item}
-              className="font-heading cursor-pointer text-xl font-semibold tracking-tight whitespace-nowrap text-foreground"
+              className="font-heading cursor-pointer text-xl font-semibold tracking-tight whitespace-nowrap text-foreground opacity-55 transition-opacity duration-300 group-hover:opacity-35 hover:opacity-100 focus:opacity-100 focus:outline-none"
             >
               {tech}
             </motion.span>
