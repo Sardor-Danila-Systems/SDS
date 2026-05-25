@@ -28,7 +28,7 @@ export function CursorGlow() {
 
   return (
     <motion.div
-      className="pointer-events-none fixed z-[30] h-[min(55vw,420px)] w-[min(55vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/[0.11] blur-[72px] mix-blend-screen"
+      className="pointer-events-none fixed z-30 h-[min(55vw,420px)] w-[min(55vw,420px)] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/11 blur-[72px] mix-blend-screen"
       style={{ left: x, top: y }}
       aria-hidden
     />
