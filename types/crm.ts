@@ -108,6 +108,7 @@ export const ACTIVITY_KINDS = [
   "PROPOSAL_SENT",
   "STATUS_CHANGE",
   "PAYMENT",
+  "EXPENSE",
   "TASK_COMPLETED",
   "PROJECT_CREATED",
   "CONVERTED",
@@ -139,7 +140,13 @@ export const CLIENT_PROJECT_STATUSES = [
 export type ClientProjectStatus = (typeof CLIENT_PROJECT_STATUSES)[number];
 
 /** What an activity is attached to. */
-export type EntityType = "lead" | "prospect" | "client" | "project" | "task";
+export type EntityType =
+  | "lead"
+  | "prospect"
+  | "client"
+  | "project"
+  | "task"
+  | "expense";
 
 export interface User {
   id: string;
@@ -266,6 +273,30 @@ export interface ClientProject {
   deletedAt?: string;
 }
 
+export const EXPENSE_CATEGORIES = [
+  "SALARY",
+  "SERVICES",
+  "MARKETING",
+  "TAXES",
+  "OTHER",
+] as const;
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
+
+/** Money going out. Income is `Payment` on a project; this is its counterpart. */
+export interface Expense {
+  id: string;
+  amount: number;
+  currency: string;
+  paidAt: string;
+  category: ExpenseCategory;
+  note?: string;
+  /** Optional: the client project the cost belongs to. */
+  projectId?: string;
+  createdBy: string;
+  createdAt: string;
+  deletedAt?: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -343,6 +374,7 @@ export interface CrmData {
   tasks: Task[];
   meetings: Meeting[];
   proposals: Proposal[];
+  expenses: Expense[];
   activities: Activity[];
 }
 
@@ -356,5 +388,6 @@ export const emptyCrmData: CrmData = {
   tasks: [],
   meetings: [],
   proposals: [],
+  expenses: [],
   activities: [],
 };

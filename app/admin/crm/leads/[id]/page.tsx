@@ -28,7 +28,7 @@ import {
 const KIND_LABEL: Record<string, string> = {
   NOTE: "Заметка", CALL: "Звонок", MEETING: "Встреча", MESSAGE: "Сообщение",
   EMAIL: "Email", PROPOSAL_SENT: "КП отправлено", STATUS_CHANGE: "Статус",
-  PAYMENT: "Оплата", TASK_COMPLETED: "Задача", PROJECT_CREATED: "Проект",
+  PAYMENT: "Оплата", EXPENSE: "Расход", TASK_COMPLETED: "Задача", PROJECT_CREATED: "Проект",
   CONVERTED: "Конвертация", CREATED: "Создано", UPDATED: "Изменено",
 };
 

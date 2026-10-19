@@ -10,6 +10,8 @@ import type {
   ClientProject,
   CrmData,
   EntityType,
+  Expense,
+  ExpenseCategory,
   Lead,
   LeadStage,
   Meeting,
@@ -100,6 +102,12 @@ export async function listMeetings() {
 export async function listProjects() {
   const { projects } = await getCrm();
   return alive(projects);
+}
+
+export async function listExpenses() {
+  await requirePermission("finance.view");
+  const { expenses } = await getCrm();
+  return alive(expenses).sort((a, b) => b.paidAt.localeCompare(a.paidAt));
 }
 
 export async function getLead(leadId: string) {
@@ -767,6 +775,149 @@ export async function updateClientProject(
     }
     return project;
   });
+}
+
+export async function addExpense(input: {
+  amount: number;
+  currency: string;
+  paidAt: string;
+  category: ExpenseCategory;
+  note?: string;
+  projectId?: string;
+}) {
+  const actor = await requirePermission("finance.write");
+
+  return mutateCrm((data) => {
+    if (input.projectId && !data.projects.some((p) => p.id === input.projectId)) {
+      throw new Error("Проект не найден.");
+    }
+    const expense: Expense = {
+      id: id(),
+      amount: input.amount,
+      currency: input.currency,
+      paidAt: input.paidAt,
+      category: input.category,
+      note: input.note,
+      projectId: input.projectId,
+      createdBy: actor.id,
+      createdAt: now(),
+    };
+    data.expenses.push(expense);
+
+    log(data, actor, {
+      kind: "EXPENSE",
+      entityType: "expense",
+      entityId: expense.id,
+      summary: `Расход ${formatAmount(input)}${input.note ? ` — ${input.note}` : ""}`,
+    });
+    return expense;
+  });
+}
+
+export async function deleteExpense(expenseId: string) {
+  const actor = await requirePermission("finance.write");
+
+  return mutateCrm((data) => {
+    const expense = data.expenses.find((e) => e.id === expenseId && !e.deletedAt);
+    if (!expense) throw new Error("Расход не найден.");
+    expense.deletedAt = now();
+
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "expense",
+      entityId: expense.id,
+      summary: `Расход удалён: ${formatAmount(expense)}`,
+    });
+    return expense;
+  });
+}
+
+export interface CurrencyFinance {
+  currency: string;
+  income: number;
+  expenses: number;
+  balance: number;
+  /** Agreed price of projects minus what has been paid — money owed to us. */
+  receivable: number;
+  months: { month: string; income: number; expenses: number }[];
+  projects: {
+    id: string;
+    name: string;
+    total: number;
+    paid: number;
+    spent: number;
+    remaining: number;
+  }[];
+}
+
+/**
+ * Company-wide money, split by currency — sums and dollars are never added
+ * together. The only place these totals are computed besides `projectFinance`.
+ */
+export async function financeSummary(): Promise<CurrencyFinance[]> {
+  await requirePermission("finance.view");
+  const { projects, expenses } = await getCrm();
+  const liveProjects = alive(projects);
+  const liveExpenses = alive(expenses);
+
+  const byCurrency = new Map<string, CurrencyFinance>();
+  const bucket = (currency: string) => {
+    let entry = byCurrency.get(currency);
+    if (!entry) {
+      entry = {
+        currency,
+        income: 0,
+        expenses: 0,
+        balance: 0,
+        receivable: 0,
+        months: [],
+        projects: [],
+      };
+      byCurrency.set(currency, entry);
+    }
+    return entry;
+  };
+  const month = (entry: CurrencyFinance, key: string) => {
+    let row = entry.months.find((m) => m.month === key);
+    if (!row) {
+      row = { month: key, income: 0, expenses: 0 };
+      entry.months.push(row);
+    }
+    return row;
+  };
+
+  for (const project of liveProjects) {
+    const f = projectFinance(project);
+    const entry = bucket(f.currency);
+    entry.receivable += f.remaining;
+    const spent = liveExpenses
+      .filter((e) => e.projectId === project.id && e.currency === f.currency)
+      .reduce((sum, e) => sum + e.amount, 0);
+    entry.projects.push({
+      id: project.id,
+      name: project.name,
+      total: f.total,
+      paid: f.paid,
+      spent,
+      remaining: f.remaining,
+    });
+    for (const payment of project.payments) {
+      const e = bucket(payment.currency);
+      e.income += payment.amount;
+      month(e, payment.paidAt.slice(0, 7)).income += payment.amount;
+    }
+  }
+  for (const expense of liveExpenses) {
+    const e = bucket(expense.currency);
+    e.expenses += expense.amount;
+    month(e, expense.paidAt.slice(0, 7)).expenses += expense.amount;
+  }
+
+  for (const entry of byCurrency.values()) {
+    entry.balance = entry.income - entry.expenses;
+    entry.months.sort((a, b) => b.month.localeCompare(a.month));
+  }
+  return [...byCurrency.values()];
 }
 
 /** Money summary for one project — the only place these sums are computed. */

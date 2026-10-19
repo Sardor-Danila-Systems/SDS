@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import {
   AuthzError,
   addLeadActivity,
+  addExpense,
   addPayment,
+  deleteExpense,
   createClientProject,
   createMeeting,
   createProposal,
@@ -22,6 +24,10 @@ import {
   updateTask,
 } from "@/lib/crm/repo";
 import { CrmStoreError } from "@/lib/crm/store";
+import {
+  EXPENSE_CATEGORIES,
+  type ExpenseCategory,
+} from "@/types/crm";
 import type {
   ActivityKind,
   ClientProjectStatus,
@@ -353,4 +359,30 @@ export async function addPaymentAction(
       note: text(form, "note"),
     }),
   );
+}
+
+export async function addExpenseAction(form: FormData): Promise<ActionResult> {
+  const amount = Number((text(form, "amount") ?? "").replace(/[^\d.-]/g, ""));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { ok: false, error: "Укажите сумму расхода." };
+  }
+  const category = text(form, "category") as ExpenseCategory | undefined;
+
+  return run(() =>
+    addExpense({
+      amount,
+      currency: text(form, "currency") ?? "UZS",
+      paidAt: text(form, "paidAt") ?? new Date().toISOString().slice(0, 10),
+      category:
+        category && EXPENSE_CATEGORIES.includes(category) ? category : "OTHER",
+      note: text(form, "note"),
+      projectId: text(form, "projectId"),
+    }),
+  );
+}
+
+export async function deleteExpenseAction(
+  expenseId: string,
+): Promise<ActionResult> {
+  return run(() => deleteExpense(expenseId));
 }
