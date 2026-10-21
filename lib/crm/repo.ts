@@ -4,6 +4,7 @@ import {
   createSalt,
   getSessionUser,
   hashPassword,
+  verifyUserPassword,
   type SessionUser,
 } from "@/lib/auth";
 import { can, type Permission } from "./rbac";
@@ -1312,6 +1313,64 @@ export async function setUserActive(userId: string, active: boolean) {
       entityType: "user",
       entityId: user.id,
       summary: `${active ? "Аккаунт включён" : "Аккаунт отключён"}: ${user.name}`,
+    });
+    return user;
+  });
+}
+
+const MIN_PASSWORD = 8;
+
+async function applyPassword(user: User, password: string) {
+  const salt = createSalt();
+  user.passwordSalt = salt;
+  user.passwordHash = await hashPassword(password, salt);
+}
+
+/** Your own password. The bootstrap admin's lives in the server's env, not here. */
+export async function changeOwnPassword(current: string, next: string) {
+  const actor = await requireUser();
+  if (next.length < MIN_PASSWORD) {
+    throw new Error(`Новый пароль — не короче ${MIN_PASSWORD} символов.`);
+  }
+
+  // Hash outside the queue; only the write has to be serialised.
+  return mutateCrm(async (data) => {
+    const user = data.users.find((u) => u.id === actor.id);
+    if (!user) {
+      throw new Error(
+        "Пароль этого аккаунта задаётся в настройках сервера (ADMIN_PASSWORD).",
+      );
+    }
+    if (!(await verifyUserPassword(user, current))) {
+      throw new Error("Текущий пароль указан неверно.");
+    }
+    await applyPassword(user, next);
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "user",
+      entityId: user.id,
+      summary: `${user.name} сменил(а) пароль`,
+    });
+    return user;
+  });
+}
+
+/** Admin sets a new password for someone — they asked, or forgot theirs. */
+export async function setUserPassword(userId: string, next: string) {
+  const actor = await requirePermission("users.manage");
+  if (next.length < MIN_PASSWORD) {
+    throw new Error(`Пароль — не короче ${MIN_PASSWORD} символов.`);
+  }
+
+  return mutateCrm(async (data) => {
+    const user = data.users.find((u) => u.id === userId);
+    if (!user) throw new Error("Пользователь не найден.");
+    await applyPassword(user, next);
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "user",
+      entityId: user.id,
+      summary: `Админ задал новый пароль: ${user.name}`,
     });
     return user;
   });
