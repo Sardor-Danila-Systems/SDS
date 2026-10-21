@@ -63,6 +63,9 @@ export default async function TrackerPage({
       ownerName: person?.name ?? "Не назначен",
       ownerRole: person?.role,
       projectName: projects.find((p) => p.id === task.projectId)?.name,
+      createdAt: task.createdAt,
+      updatedAt: task.updatedAt,
+      completedAt: task.completedAt,
     };
   });
 

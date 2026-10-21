@@ -8,6 +8,7 @@ import {
   CalendarDays,
   Columns3,
   FolderKanban,
+  Gauge,
   KanbanSquare,
   Globe,
   LayoutDashboard,
@@ -52,7 +53,10 @@ const GROUPS: NavGroup[] = [
   },
   {
     label: "Задачи",
-    items: [{ href: "/admin/tracker", label: "Трекер", icon: KanbanSquare }],
+    items: [
+      { href: "/admin/control", label: "Контроль", icon: Gauge, roles: ["ADMIN"] },
+      { href: "/admin/tracker", label: "Трекер", icon: KanbanSquare },
+    ],
   },
   {
     label: "Продажи",

@@ -498,3 +498,12 @@ export async function setUserPasswordAction(
   if (!next) return { ok: false, error: "Введите новый пароль." };
   return run(() => setUserPassword(userId, next));
 }
+
+/** Drag on the board: the status, and — dropped into another person's lane — the assignee. */
+export async function moveTaskAction(
+  taskId: string,
+  status: TaskStatus,
+  ownerId?: string,
+): Promise<ActionResult> {
+  return run(() => updateTask(taskId, { status, ...(ownerId ? { ownerId } : {}) }));
+}
