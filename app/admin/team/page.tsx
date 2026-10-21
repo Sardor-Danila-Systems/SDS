@@ -51,13 +51,13 @@ export default async function TeamPage() {
       />
 
       <section className="grid gap-4 sm:grid-cols-3">
-        <Stat icon={ListChecks} value={String(totals.open)} label="Открытых задач" href="/admin/crm/tasks" />
+        <Stat icon={ListChecks} value={String(totals.open)} label="Открытых задач" href="/admin/tracker" />
         <Stat
           icon={TriangleAlert}
           value={String(totals.overdue)}
           label="Просрочено"
           tone={totals.overdue ? "warn" : "default"}
-          href="/admin/crm/tasks"
+          href="/admin/tracker"
         />
         <Stat icon={CheckCircle2} value={String(totals.done)} label="Выполнено за 7 дней" tone="accent" />
       </section>
@@ -71,7 +71,7 @@ export default async function TeamPage() {
             >
               <div className="min-w-0">
                 <Link
-                  href={`/admin/crm/tasks?user=${m.id}`}
+                  href={`/admin/tracker?owner=${m.id}`}
                   className={m.active ? "font-medium hover:text-primary" : "text-muted-foreground line-through"}
                 >
                   {m.name}

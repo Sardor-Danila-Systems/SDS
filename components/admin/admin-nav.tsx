@@ -6,9 +6,9 @@ import { useState } from "react";
 import {
   Briefcase,
   CalendarDays,
-  CheckSquare,
   Columns3,
   FolderKanban,
+  KanbanSquare,
   Globe,
   LayoutDashboard,
   Menu,
@@ -51,11 +51,14 @@ const GROUPS: NavGroup[] = [
     items: [{ href: "/admin", label: "Сегодня", icon: LayoutDashboard }],
   },
   {
+    label: "Задачи",
+    items: [{ href: "/admin/tracker", label: "Трекер", icon: KanbanSquare }],
+  },
+  {
     label: "Продажи",
     items: [
       { href: "/admin/crm/leads", label: "Лиды", icon: Users },
       { href: "/admin/crm/pipeline", label: "Воронка", icon: Columns3 },
-      { href: "/admin/crm/tasks", label: "Задачи", icon: CheckSquare },
       { href: "/admin/crm/meetings", label: "Встречи", icon: CalendarDays },
       { href: "/admin/crm/prospects", label: "Кому написать", icon: Send },
     ],

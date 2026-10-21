@@ -90,7 +90,13 @@ export const SOURCES = [
 ] as const;
 export type Source = (typeof SOURCES)[number];
 
-export const TASK_STATUSES = ["TODO", "IN_PROGRESS", "DONE", "CANCELLED"] as const;
+export const TASK_STATUSES = [
+  "TODO",
+  "IN_PROGRESS",
+  "REVIEW",
+  "DONE",
+  "CANCELLED",
+] as const;
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
 export const PRIORITIES = ["LOW", "MEDIUM", "HIGH", "URGENT"] as const;
@@ -298,6 +304,14 @@ export interface Expense {
   deletedAt?: string;
 }
 
+export interface TaskComment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  text: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -305,6 +319,11 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   dueAt?: string;
+  /** Sequential key (SDS-12). Filled in on read for tasks that predate it. */
+  number?: number;
+  /** The client project this task belongs to, if any. */
+  projectId?: string;
+  comments?: TaskComment[];
   /** The assignee. Sales and developers only ever see tasks they own. */
   ownerId?: string;
   createdById?: string;

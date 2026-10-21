@@ -4,10 +4,11 @@ import { setTaskStatusAction } from "@/app/admin/crm/actions";
 import type { TaskStatus } from "@/types/crm";
 import { StatusPicker } from "./status-picker";
 
-const OPTIONS = ["TODO", "IN_PROGRESS", "DONE"] as const;
+const OPTIONS = ["TODO", "IN_PROGRESS", "REVIEW", "DONE"] as const;
 const LABELS: Record<string, string> = {
   TODO: "К выполнению",
   IN_PROGRESS: "В работе",
+  REVIEW: "На проверке",
   DONE: "Готово",
 };
 

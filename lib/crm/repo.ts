@@ -25,6 +25,7 @@ import type {
   Prospect,
   Role,
   Task,
+  TaskComment,
   User,
 } from "@/types/crm";
 
@@ -104,10 +105,39 @@ function visibleTasks(user: SessionUser, tasks: Task[]) {
     : rows.filter((task) => task.ownerId === user.id);
 }
 
+/**
+ * Sequential keys (SDS-1, SDS-2…). Tasks created before numbering existed get
+ * theirs in order of creation, after the highest one already handed out — the
+ * same rule on read and on write, so a key never changes once shown.
+ */
+export function numberTasks(tasks: Task[]): Map<string, number> {
+  const numbers = new Map<string, number>();
+  let max = 0;
+  for (const task of tasks) {
+    if (task.number) {
+      numbers.set(task.id, task.number);
+      max = Math.max(max, task.number);
+    }
+  }
+  const missing = tasks
+    .filter((t) => !t.number)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  for (const task of missing) numbers.set(task.id, ++max);
+  return numbers;
+}
+
 export async function listTasks() {
   const user = await requirePermission("crm.view");
   const { tasks } = await getCrm();
-  return visibleTasks(user, tasks);
+  const numbers = numberTasks(tasks);
+  return visibleTasks(user, tasks).map((task) => ({
+    ...task,
+    number: numbers.get(task.id),
+  }));
+}
+
+export async function getTask(taskId: string) {
+  return (await listTasks()).find((task) => task.id === taskId) ?? null;
 }
 
 export async function listMeetings() {
@@ -570,8 +600,15 @@ export async function createTask(input: Partial<Task> & { title: string }) {
       throw new Error("Исполнитель не найден.");
     }
 
+    // Persist keys for older tasks first, so the new one follows them.
+    const numbers = numberTasks(data.tasks);
+    for (const existing of data.tasks) existing.number = numbers.get(existing.id);
+    const number = Math.max(0, ...numbers.values()) + 1;
+
     const task: Task = {
       id: id(),
+      number,
+      projectId: input.projectId,
       title: input.title.trim(),
       description: input.description,
       status: input.status ?? "TODO",
@@ -593,8 +630,8 @@ export async function createTask(input: Partial<Task> & { title: string }) {
       entityId: task.id,
       summary:
         ownerId === actor.id
-          ? `Задача: ${task.title}`
-          : `Задача для ${userName(data, ownerId)}: ${task.title}`,
+          ? `SDS-${number}: ${task.title}`
+          : `SDS-${number} для ${userName(data, ownerId)}: ${task.title}`,
     });
     return task;
   });
@@ -611,10 +648,17 @@ export async function updateTask(taskId: string, patch: Partial<Task>) {
       throw new Error("Задача не найдена.");
     }
 
-    // Only whoever hands out the work may move it to someone else.
-    const { ownerId, ...rest } = patch;
-    const safe: Partial<Task> = mayAssign ? { ...rest, ownerId } : rest;
-    if (!mayAssign || ownerId === undefined) delete safe.ownerId;
+    // Only these fields are editable; only whoever hands out the work may
+    // move a task to someone else.
+    const safe: Partial<Task> = {};
+    for (const key of [
+      "title", "description", "status", "priority", "dueAt", "projectId",
+    ] as const) {
+      if (key in patch) (safe as Record<string, unknown>)[key] = patch[key];
+    }
+    if (mayAssign && patch.ownerId !== undefined) safe.ownerId = patch.ownerId;
+    if (safe.title !== undefined) safe.title = safe.title.trim();
+    if (safe.title === "") throw new Error("Название не может быть пустым.");
 
     const previous = task.status;
     const completing = safe.status === "DONE" && previous !== "DONE";
@@ -641,6 +685,30 @@ export async function updateTask(taskId: string, patch: Partial<Task>) {
       });
     }
     return task;
+  });
+}
+
+export async function addTaskComment(taskId: string, text: string) {
+  const actor = await requirePermission("task.write");
+  const body = text.trim();
+  if (!body) throw new Error("Напишите комментарий.");
+  if (body.length > 2000) throw new Error("Комментарий слишком длинный.");
+
+  return mutateCrm((data) => {
+    const task = data.tasks.find((t) => t.id === taskId && !t.deletedAt);
+    if (!task || (!can(actor.role, "task.assign") && task.ownerId !== actor.id)) {
+      throw new Error("Задача не найдена.");
+    }
+    const comment: TaskComment = {
+      id: id(),
+      authorId: actor.id,
+      authorName: actor.name,
+      text: body,
+      createdAt: now(),
+    };
+    task.comments = [...(task.comments ?? []), comment];
+    task.updatedAt = now();
+    return comment;
   });
 }
 
@@ -1022,7 +1090,7 @@ export async function listNotifications(): Promise<Notification[]> {
       out.push({
         id: `task-${task.id}`,
         text: `Задача просрочена: ${task.title}${who}`,
-        href: "/admin/crm/tasks",
+        href: "/admin/tracker",
         tone: "warn",
       });
     }
@@ -1168,7 +1236,9 @@ export async function teamOverview() {
 
   const members: TeamMember[] = people.map((person) => {
     const mine = tasks.filter((t) => t.ownerId === person.id);
-    const open = mine.filter((t) => t.status === "TODO" || t.status === "IN_PROGRESS");
+    const open = mine.filter(
+      (t) => t.status === "TODO" || t.status === "IN_PROGRESS" || t.status === "REVIEW",
+    );
     return {
       ...person,
       open: open.length,

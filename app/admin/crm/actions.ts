@@ -6,6 +6,7 @@ import {
   AuthzError,
   addLeadActivity,
   addExpense,
+  addTaskComment,
   createTeamUser,
   setUserActive,
   addPayment,
@@ -247,6 +248,7 @@ export async function addTaskAction(form: FormData): Promise<ActionResult> {
       entityType: text(form, "entityType") as "lead" | undefined,
       entityId: text(form, "entityId"),
       ownerId: text(form, "ownerId"),
+      projectId: text(form, "projectId"),
     }),
   );
 }
@@ -420,4 +422,53 @@ export async function setUserActiveAction(
   active: boolean,
 ): Promise<ActionResult> {
   return run(() => setUserActive(userId, active));
+}
+
+/* --------------------------------- tracker -------------------------------- */
+
+export async function editTaskAction(
+  taskId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  const title = text(form, "title");
+  if (!title) return { ok: false, error: "Укажите название задачи." };
+  const ownerId = text(form, "ownerId");
+
+  return run(() =>
+    updateTask(taskId, {
+      title,
+      description: text(form, "description"),
+      priority: (text(form, "priority") as Priority) ?? "MEDIUM",
+      dueAt: text(form, "dueAt"),
+      projectId: text(form, "projectId"),
+      ...(ownerId ? { ownerId } : {}),
+    }),
+  );
+}
+
+export async function commentTaskAction(
+  taskId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  return run(() => addTaskComment(taskId, text(form, "text") ?? ""));
+}
+
+export async function createTrackerTaskAction(
+  form: FormData,
+): Promise<ActionResult> {
+  const title = text(form, "title");
+  if (!title) return { ok: false, error: "Укажите название задачи." };
+
+  const result = await run(() =>
+    createTask({
+      title,
+      description: text(form, "description"),
+      priority: (text(form, "priority") as Priority) ?? "MEDIUM",
+      dueAt: text(form, "dueAt"),
+      ownerId: text(form, "ownerId"),
+      projectId: text(form, "projectId"),
+    }),
+  );
+  if (result.ok && result.id) redirect(`/admin/tracker/${result.id}`);
+  return result;
 }
