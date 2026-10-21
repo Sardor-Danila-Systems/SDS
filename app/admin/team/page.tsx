@@ -7,8 +7,9 @@ import { ROLES } from "@/types/crm";
 import { EmptyState, Panel, PageHeader, Stat, formatDate } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, SelectField } from "@/components/crm/fields";
+import { PasswordField } from "@/components/crm/password-field";
 import { UserActiveToggle } from "@/components/crm/user-active";
-import { createUserAction } from "../crm/actions";
+import { createUserAction, setUserPasswordAction } from "../crm/actions";
 
 const ROLE_LABEL: Record<string, string> = {
   ADMIN: "Админ",
@@ -95,6 +96,23 @@ export default async function TeamPage() {
                   <UserActiveToggle userId={m.id} active={m.active} />
                 ) : null}
               </div>
+              {m.id !== "bootstrap-admin" ? (
+                <details className="group w-full">
+                  <summary className="cursor-pointer list-none text-xs text-muted-foreground transition-colors hover:text-foreground">
+                    Задать новый пароль
+                  </summary>
+                  <div className="mt-3 max-w-xs">
+                    <ActionForm
+                      action={setUserPasswordAction.bind(null, m.id)}
+                      submitLabel="Сохранить пароль"
+                      pendingLabel="Сохраняем…"
+                      savedLabel="Пароль изменён"
+                    >
+                      <PasswordField name="next" label="Новый пароль" autoComplete="new-password" placeholder="не короче 8 символов" />
+                    </ActionForm>
+                  </div>
+                </details>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -124,7 +142,7 @@ export default async function TeamPage() {
             <ActionForm action={createUserAction} submitLabel="Создать" pendingLabel="Создаём…">
               <Field label="Имя" name="name" required placeholder="Алиса Иванова" />
               <Field label="Логин" name="login" required placeholder="alisa" />
-              <Field label="Пароль" name="password" type="password" required placeholder="не короче 8 символов" />
+              <PasswordField label="Пароль" name="password" placeholder="не короче 8 символов" autoComplete="new-password" />
               <SelectField
                 label="Роль" name="role" defaultValue="SALES"
                 options={ROLES.map((r) => ({ value: r, label: ROLE_LABEL[r] ?? r }))}

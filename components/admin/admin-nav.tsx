@@ -119,13 +119,19 @@ function Brand() {
 function UserCard({ role, userName }: { role: Role; userName: string }) {
   return (
     <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 shadow-[var(--shadow-panel)]">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
-        {initials(userName)}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium leading-tight">{userName}</p>
-        <p className="truncate text-xs text-muted-foreground">{ROLE_LABEL[role]}</p>
-      </div>
+      <Link
+        href="/admin/profile"
+        title="Профиль и пароль"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg transition-colors hover:opacity-80"
+      >
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
+          {initials(userName)}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium leading-tight">{userName}</span>
+          <span className="block truncate text-xs text-muted-foreground">{ROLE_LABEL[role]}</span>
+        </span>
+      </Link>
       <LogoutButton />
     </div>
   );

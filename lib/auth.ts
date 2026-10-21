@@ -176,6 +176,13 @@ export async function authenticate(
   return { id: user.id, name: user.name, login: user.login, role: user.role };
 }
 
+/** True when `password` is the stored password of this CRM user. */
+export async function verifyUserPassword(user: User, password: string) {
+  if (!user.passwordHash || !user.passwordSalt) return false;
+  const hash = await hashPassword(password, user.passwordSalt);
+  return safeEqual(hash, user.passwordHash);
+}
+
 /** Everyone who can own a record — the bootstrap admin included. */
 export async function listAssignableUsers(): Promise<SessionUser[]> {
   const { users } = await readCrm();

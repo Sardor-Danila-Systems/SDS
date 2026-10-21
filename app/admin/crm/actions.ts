@@ -7,6 +7,8 @@ import {
   addLeadActivity,
   addExpense,
   addTaskComment,
+  changeOwnPassword,
+  setUserPassword,
   createTeamUser,
   setUserActive,
   addPayment,
@@ -471,4 +473,28 @@ export async function createTrackerTaskAction(
   );
   if (result.ok && result.id) redirect(`/admin/tracker/${result.id}`);
   return result;
+}
+
+/* -------------------------------- passwords ------------------------------- */
+
+export async function changePasswordAction(form: FormData): Promise<ActionResult> {
+  const current = text(form, "current");
+  const next = text(form, "next");
+  if (!current || !next) return { ok: false, error: "Заполните все поля." };
+  if (next !== text(form, "repeat")) {
+    return { ok: false, error: "Новые пароли не совпадают." };
+  }
+  if (next === current) {
+    return { ok: false, error: "Новый пароль совпадает с текущим." };
+  }
+  return run(() => changeOwnPassword(current, next));
+}
+
+export async function setUserPasswordAction(
+  userId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  const next = text(form, "next");
+  if (!next) return { ok: false, error: "Введите новый пароль." };
+  return run(() => setUserPassword(userId, next));
 }
