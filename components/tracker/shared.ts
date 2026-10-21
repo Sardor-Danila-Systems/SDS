@@ -12,6 +12,9 @@ export interface TaskView {
   ownerName: string;
   ownerRole?: Role;
   projectName?: string;
+  createdAt: string;
+  updatedAt: string;
+  completedAt?: string;
 }
 
 export type Department = "SALES" | "DEV" | "ADMIN";
