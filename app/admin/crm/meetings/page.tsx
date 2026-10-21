@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { AuthzError, listLeads, listMeetings } from "@/lib/crm/repo";
 import { MEETING_TYPES } from "@/types/crm";
-import { EmptyState, PageHeader, formatDateTime } from "@/components/crm/ui";
+import { EmptyState, Panel, PageHeader, formatDateTime } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
 import { addMeetingAction } from "../actions";
@@ -34,27 +34,26 @@ export default async function MeetingsPage() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader label="Продажи" title="Встречи" hint={`${upcoming.length} впереди`} />
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
-        <div className="space-y-10">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <div className="space-y-6">
           {meetings.length === 0 ? (
             <EmptyState title="Встреч пока нет" hint="Запланируйте первую — она появится на дашборде в день встречи." />
           ) : (
             <>
-              <section>
-                <h2 className="label">Ближайшие</h2>
+              <Panel flush title="Ближайшие">
                 {upcoming.length === 0 ? (
-                  <p className="mt-3 text-[0.9375rem] text-muted-foreground">Ничего не запланировано.</p>
+                  <p className="px-5 py-6 text-sm text-muted-foreground">Ничего не запланировано.</p>
                 ) : (
-                  <ul className="mt-3 border-t border-border">
+                  <ul className="divide-y divide-border">
                     {upcoming.map((m) => (
-                      <li key={m.id} className="grid gap-2 border-b border-border py-4 sm:grid-cols-12 sm:gap-4">
-                        <span className="num text-subtle-foreground sm:col-span-3">{formatDateTime(m.startAt)}</span>
+                      <li key={m.id} className="grid gap-2 px-5 py-4 sm:grid-cols-12 sm:gap-4">
+                        <span className="text-sm tabular text-muted-foreground sm:col-span-3">{formatDateTime(m.startAt)}</span>
                         <div className="sm:col-span-9">
-                          <p className="text-[0.9375rem]">
-                            <span className="label mr-2 inline">{TYPE_LABEL[m.type] ?? m.type}</span>
+                          <p className="text-sm font-medium">
+                            <span className="mr-2 inline-flex rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary">{TYPE_LABEL[m.type] ?? m.type}</span>
                             {m.title}
                           </p>
                           <p className="mt-1 flex flex-wrap gap-x-3 text-xs text-subtle-foreground">
@@ -70,28 +69,27 @@ export default async function MeetingsPage() {
                     ))}
                   </ul>
                 )}
-              </section>
+              </Panel>
 
               {past.length > 0 ? (
-                <section>
-                  <h2 className="label">Прошедшие</h2>
-                  <ul className="mt-3 border-t border-border">
+                <Panel flush title="Прошедшие">
+                  <ul className="divide-y divide-border">
                     {past.slice(0, 10).map((m) => (
-                      <li key={m.id} className="grid gap-2 border-b border-border py-4 text-muted-foreground sm:grid-cols-12 sm:gap-4">
-                        <span className="num sm:col-span-3">{formatDateTime(m.startAt)}</span>
-                        <span className="text-[0.9375rem] sm:col-span-9">{m.title}</span>
+                      <li key={m.id} className="grid gap-2 px-5 py-3.5 text-muted-foreground sm:grid-cols-12 sm:gap-4">
+                        <span className="text-sm tabular sm:col-span-3">{formatDateTime(m.startAt)}</span>
+                        <span className="text-sm sm:col-span-9">{m.title}</span>
                       </li>
                     ))}
                   </ul>
-                </section>
+                </Panel>
               ) : null}
             </>
           )}
         </div>
 
-        <aside>
-          <h2 className="label border-b border-border pb-3">Запланировать</h2>
-          <div className="mt-6">
+        <aside className="lg:sticky lg:top-20">
+          <Panel title="Запланировать">
+          <div>
             <ActionForm action={addMeetingAction} submitLabel="Запланировать" pendingLabel="Сохраняем…">
               <Field label="Тема" name="title" required placeholder="Демо CRM" />
               <FieldRow>
@@ -116,6 +114,7 @@ export default async function MeetingsPage() {
               <TextField label="Заметки" name="description" rows={2} />
             </ActionForm>
           </div>
+          </Panel>
         </aside>
       </div>
     </div>

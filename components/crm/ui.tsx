@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { Inbox, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { LeadStage, Priority, ProspectStage, Source, TaskStatus } from "@/types/crm";
 
@@ -9,27 +10,65 @@ import type { LeadStage, Priority, ProspectStage, Source, TaskStatus } from "@/t
 */
 
 export function PageHeader({
-  label,
   title,
   hint,
   action,
 }: {
-  label: string;
+  /** Kept so call sites read naturally; the title carries the page. */
+  label?: string;
   title: string;
   hint?: ReactNode;
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-6 border-b border-border pb-8 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <span className="label">{label}</span>
-        <h1 className="display-3 mt-3">{title}</h1>
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.03em]">
+          {title}
+        </h1>
         {hint ? (
-          <p className="mt-3 text-[0.9375rem] text-muted-foreground">{hint}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{hint}</p>
         ) : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
+  );
+}
+
+/**
+ * The one container for grouped content. A titled card with an optional
+ * action; `flush` lets lists and tables run edge to edge.
+ */
+export function Panel({
+  title,
+  description,
+  action,
+  flush,
+  className,
+  children,
+}: {
+  title?: ReactNode;
+  description?: ReactNode;
+  action?: ReactNode;
+  flush?: boolean;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className={cn("admin-panel overflow-hidden", className)}>
+      {title || action ? (
+        <header className="flex items-center justify-between gap-4 border-b border-border px-5 py-3.5">
+          <div className="min-w-0">
+            {title ? <h2 className="label">{title}</h2> : null}
+            {description ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
+          {action ? <div className="shrink-0 text-sm">{action}</div> : null}
+        </header>
+      ) : null}
+      <div className={flush ? "" : "p-5"}>{children}</div>
+    </section>
   );
 }
 
@@ -43,7 +82,7 @@ export function PrimaryAction({
   return (
     <Link
       href={href}
-      className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-primary px-5 text-[0.9375rem] font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+      className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-panel)] transition-colors hover:bg-primary-hover"
     >
       {children}
     </Link>
@@ -55,33 +94,40 @@ export function EmptyState({
   title,
   hint,
   action,
+  icon: Icon = Inbox,
 }: {
   title: string;
   hint?: string;
   action?: ReactNode;
+  icon?: LucideIcon;
 }) {
   return (
-    <div className="flex flex-col items-center gap-4 border border-dashed border-border px-6 py-20 text-center">
-      <p className="text-lg tracking-[-0.02em]">{title}</p>
+    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border-strong bg-card/50 px-6 py-16 text-center">
+      <span className="flex size-11 items-center justify-center rounded-full bg-surface text-muted-foreground">
+        <Icon className="size-5" />
+      </span>
+      <p className="text-base font-medium tracking-[-0.01em]">{title}</p>
       {hint ? (
-        <p className="max-w-sm text-[0.9375rem] text-muted-foreground">{hint}</p>
+        <p className="max-w-sm text-sm text-muted-foreground">{hint}</p>
       ) : null}
       {action}
     </div>
   );
 }
 
+const NEUTRAL = "bg-surface text-muted-foreground";
+const ACTIVE = "bg-primary-soft text-primary";
 const STAGE_TONE: Record<string, string> = {
-  NEW: "border-border text-muted-foreground",
-  TO_CONTACT: "border-border text-muted-foreground",
-  CONTACTED: "border-border-strong text-foreground",
-  INTERESTED: "border-primary/40 text-primary",
-  MEETING: "border-primary/40 text-primary",
-  PROPOSAL: "border-primary/40 text-primary",
-  NEGOTIATION: "border-primary/40 text-primary",
-  WON: "border-emerald-600/40 text-emerald-700",
-  LOST: "border-border text-subtle-foreground",
-  NOT_NOW: "border-border text-subtle-foreground",
+  NEW: NEUTRAL,
+  TO_CONTACT: NEUTRAL,
+  CONTACTED: "bg-surface-2 text-foreground",
+  INTERESTED: ACTIVE,
+  MEETING: ACTIVE,
+  PROPOSAL: ACTIVE,
+  NEGOTIATION: ACTIVE,
+  WON: "bg-[var(--success-soft)] text-[var(--success)]",
+  LOST: "bg-surface text-subtle-foreground",
+  NOT_NOW: "bg-surface text-subtle-foreground",
 };
 
 export const STAGE_LABEL: Record<string, string> = {
@@ -101,8 +147,8 @@ export function StageBadge({ stage }: { stage: LeadStage | ProspectStage }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center whitespace-nowrap rounded-sm border px-2 py-0.5 text-xs",
-        STAGE_TONE[stage] ?? "border-border text-muted-foreground",
+        "inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium",
+        STAGE_TONE[stage] ?? NEUTRAL,
       )}
     >
       {STAGE_LABEL[stage] ?? stage}
@@ -156,10 +202,10 @@ export function sourceOptions() {
 }
 
 const PRIORITY_TONE: Record<Priority, string> = {
-  LOW: "text-subtle-foreground",
-  MEDIUM: "text-muted-foreground",
-  HIGH: "text-foreground",
-  URGENT: "text-destructive",
+  LOW: "bg-subtle-foreground/50",
+  MEDIUM: "bg-muted-foreground",
+  HIGH: "bg-[var(--warning)]",
+  URGENT: "bg-destructive",
 };
 
 export const PRIORITY_LABEL: Record<Priority, string> = {
@@ -171,7 +217,8 @@ export const PRIORITY_LABEL: Record<Priority, string> = {
 
 export function PriorityTag({ priority }: { priority: Priority }) {
   return (
-    <span className={cn("text-xs", PRIORITY_TONE[priority])}>
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+      <span className={cn("size-1.5 rounded-full", PRIORITY_TONE[priority])} />
       {PRIORITY_LABEL[priority]}
     </span>
   );
@@ -184,44 +231,61 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   CANCELLED: "Отменена",
 };
 
-/** A KPI figure. Deliberately plain — the number is the point. */
+/** A KPI tile: the figure, what it counts, and an icon to find it by. */
 export function Stat({
   value,
   label,
   tone = "default",
   href,
+  icon: Icon,
 }: {
   value: string;
   label: string;
   tone?: "default" | "accent" | "warn";
   href?: string;
+  icon?: LucideIcon;
 }) {
   const body = (
     <>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm text-muted-foreground">{label}</p>
+        {Icon ? (
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-lg",
+              tone === "accent" && "bg-primary-soft text-primary",
+              tone === "warn" && "bg-destructive/10 text-destructive",
+              tone === "default" && "bg-surface text-muted-foreground",
+            )}
+          >
+            <Icon className="size-4" />
+          </span>
+        ) : null}
+      </div>
       <p
         className={cn(
-          "text-[2rem] font-medium leading-none tracking-[-0.04em] tabular",
+          "mt-3 text-[1.75rem] font-semibold leading-none tracking-[-0.035em] tabular",
           tone === "accent" && "text-primary",
           tone === "warn" && "text-destructive",
         )}
       >
         {value}
       </p>
-      <p className="mt-2.5 text-sm text-muted-foreground">{label}</p>
     </>
   );
 
+  const shell = "admin-panel block p-5";
   if (href) {
     return (
       <Link
         href={href}
-        className="block border-t border-border-strong pt-5 transition-colors hover:border-primary"
+        className={cn(shell, "transition-colors hover:border-border-strong")}
       >
         {body}
       </Link>
     );
   }
-  return <div className="border-t border-border-strong pt-5">{body}</div>;
+  return <div className={shell}>{body}</div>;
 }
 
 /** Dates are shown in one place and one way across the CRM. */

@@ -28,10 +28,10 @@ export function TaskToggle({
                 })
             }
             className={cn(
-                "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-sm border transition-colors",
+                "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-xs transition-colors",
                 done
                     ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border-strong hover:border-foreground",
+                    : "border-border-strong hover:border-primary",
                 pending && "opacity-60",
             )}
         >

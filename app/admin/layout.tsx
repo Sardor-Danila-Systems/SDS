@@ -5,7 +5,10 @@ import { AdminNav } from "@/components/admin/admin-nav";
 import { GlobalSearch } from "@/components/crm/global-search";
 import { Notifications } from "@/components/crm/notifications";
 import { listNotifications } from "@/lib/crm/repo";
+import { ArrowUpRight } from "lucide-react";
+import { THEME_INIT_SCRIPT } from "@/components/admin/theme-toggle";
 import "../globals.css";
+import "./admin.css";
 
 /**
  * The admin panel sits outside `[locale]`, so it owns its own document — the
@@ -45,45 +48,42 @@ export default async function AdminLayout({
     const notifications = user ? await listNotifications() : [];
 
     return (
-        <html lang="ru" className={`${onest.variable} ${mono.variable}`}>
+        <html
+            lang="ru"
+            data-admin=""
+            suppressHydrationWarning
+            className={`${onest.variable} ${mono.variable}`}
+        >
+            <head>
+                <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+            </head>
             <body className="min-h-dvh bg-background font-sans text-foreground antialiased">
-                <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-xl">
-                    <div className="flex h-16 items-center justify-between gap-6 px-6">
-                        <div className="flex items-baseline gap-3">
-                            <Link
-                                href="/admin"
-                                className="text-[1.0625rem] font-semibold leading-none tracking-[-0.045em]"
-                            >
-                                SDS
-                            </Link>
-                            <span className="label">Админка</span>
-                        </div>
-
-                        {user ? (
-                            <div className="flex items-center gap-4">
+                {user ? (
+                    <div className="lg:flex">
+                        <AdminNav
+                            role={user.role}
+                            userName={user.name}
+                            mobileActions={<Notifications items={notifications} />}
+                        />
+                        <div className="min-w-0 flex-1">
+                            <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border bg-background/80 px-8 backdrop-blur-xl lg:flex">
                                 <GlobalSearch />
                                 <Notifications items={notifications} />
                                 <Link
                                     href="/"
                                     target="_blank"
-                                    className="link-wipe hidden text-[0.9375rem] text-muted-foreground transition-colors hover:text-foreground md:inline"
+                                    className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-sm text-muted-foreground shadow-[var(--shadow-panel)] transition-colors hover:text-foreground"
                                 >
-                                    Сайт
+                                    Сайт <ArrowUpRight className="size-3.5" />
                                 </Link>
-                            </div>
-                        ) : null}
-                    </div>
-                </header>
-
-                {user ? (
-                    <div className="lg:flex">
-                        <AdminNav role={user.role} userName={user.name} />
-                        <main className="min-w-0 flex-1 px-6 py-10 lg:px-10">
-                            {children}
-                        </main>
+                            </header>
+                            <main className="mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+                                {children}
+                            </main>
+                        </div>
                     </div>
                 ) : (
-                    <main className="px-6 py-10">{children}</main>
+                    <main>{children}</main>
                 )}
             </body>
         </html>

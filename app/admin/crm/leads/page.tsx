@@ -1,18 +1,25 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { Plus, Search } from "lucide-react";
+import { getSessionUser, listAssignableUsers } from "@/lib/auth";
 import { canSeeFinance } from "@/lib/crm/rbac";
 import { AuthzError, listLeads } from "@/lib/crm/repo";
 import { ACTIVE_LEAD_STAGES, pipelineColumn, type LeadStage } from "@/types/crm";
 import {
-  EmptyState, PageHeader, PrimaryAction, PriorityTag, StageBadge, STAGE_LABEL,
+  EmptyState, PageHeader, Panel, PrimaryAction, PriorityTag, StageBadge, STAGE_LABEL,
   formatDate, formatMoney,
 } from "@/components/crm/ui";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+
+const CONTROL =
+  "h-10 rounded-lg border border-input bg-card px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30";
 
 export default async function LeadsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ stage?: string; q?: string }>;
+  searchParams: Promise<{ stage?: string; q?: string; owner?: string }>;
 }) {
   const user = await getSessionUser();
   if (!user) redirect("/admin/login");
@@ -25,13 +32,18 @@ export default async function LeadsPage({
     throw error;
   }
 
-  const { stage, q } = await searchParams;
+  const { stage, q, owner } = await searchParams;
   const needle = q?.toLowerCase().trim();
   const showMoney = canSeeFinance(user.role);
+  const isAdmin = user.role === "ADMIN";
+  // The admin sees who owns each lead and can look at one salesperson's work.
+  const people = isAdmin ? await listAssignableUsers() : [];
+  const ownerName = (id?: string) => people.find((p) => p.id === id)?.name ?? "—";
 
   const filtered = leads.filter((l) => {
     if (stage && pipelineColumn(l.stage) !== pipelineColumn(stage as LeadStage))
       return false;
+    if (isAdmin && owner && l.ownerId !== owner) return false;
     if (!needle) return true;
     return [l.firstName, l.lastName, l.company, l.email, l.phone, l.city]
       .filter(Boolean)
@@ -39,36 +51,41 @@ export default async function LeadsPage({
   });
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader
-        label="Продажи"
         title="Лиды"
-        hint={`${leads.length} всего`}
-        action={<PrimaryAction href="/admin/crm/leads/new">Новый лид</PrimaryAction>}
+        hint={`${filtered.length} из ${leads.length}`}
+        action={
+          <PrimaryAction href="/admin/crm/leads/new">
+            <Plus className="size-4" /> Новый лид
+          </PrimaryAction>
+        }
       />
 
-      <form className="flex flex-wrap items-end gap-4" method="get">
-        <div className="min-w-56 flex-1">
-          <label htmlFor="q" className="label">Поиск</label>
+      <form className="flex flex-wrap items-center gap-3" method="get">
+        <div className="relative min-w-56 flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle-foreground" />
           <input
-            id="q" name="q" defaultValue={q ?? ""}
-            placeholder="имя, компания, email, телефон"
-            className="mt-2.5 flex h-11 w-full rounded-md border border-input bg-background px-4 text-[0.9375rem] focus-visible:border-ring focus-visible:outline-none"
+            id="q" name="q" defaultValue={q ?? ""} aria-label="Поиск"
+            placeholder="Имя, компания, email, телефон"
+            className={`${CONTROL} w-full pl-9`}
           />
         </div>
-        <div>
-          <label htmlFor="stage" className="label">Этап</label>
-          <select
-            id="stage" name="stage" defaultValue={stage ?? ""}
-            className="mt-2.5 flex h-11 rounded-md border border-input bg-background px-4 text-[0.9375rem]"
-          >
-            <option value="">Все</option>
-            {ACTIVE_LEAD_STAGES.map((s) => (
-              <option key={s} value={s}>{STAGE_LABEL[s] ?? s}</option>
+        <select name="stage" defaultValue={stage ?? ""} aria-label="Этап" className={CONTROL}>
+          <option value="">Все этапы</option>
+          {ACTIVE_LEAD_STAGES.map((s) => (
+            <option key={s} value={s}>{STAGE_LABEL[s] ?? s}</option>
+          ))}
+        </select>
+        {isAdmin ? (
+          <select name="owner" defaultValue={owner ?? ""} aria-label="Ответственный" className={CONTROL}>
+            <option value="">Все сотрудники</option>
+            {people.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-        </div>
-        <button type="submit" className="h-11 rounded-md border border-border-strong px-5 text-[0.9375rem] transition-colors hover:border-foreground">
+        ) : null}
+        <button type="submit" className="h-10 rounded-lg border border-border-strong bg-card px-4 text-sm font-medium transition-colors hover:bg-surface">
           Применить
         </button>
       </form>
@@ -80,43 +97,61 @@ export default async function LeadsPage({
           action={leads.length ? undefined : <PrimaryAction href="/admin/crm/leads/new">Добавить лид</PrimaryAction>}
         />
       ) : (
-        <ul className="border-t border-border">
-          {filtered.map((lead) => (
-            <li key={lead.id} className="border-b border-border">
-              <Link
-                href={`/admin/crm/leads/${lead.id}`}
-                className="group grid gap-3 py-5 md:grid-cols-12 md:items-baseline md:gap-6"
-              >
-                <div className="md:col-span-4">
-                  <p className="font-medium tracking-[-0.02em] transition-colors group-hover:text-primary">
-                    {lead.company ?? `${lead.firstName} ${lead.lastName ?? ""}`}
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {lead.company ? `${lead.firstName} ${lead.lastName ?? ""}` : lead.email ?? "—"}
-                  </p>
-                </div>
-                <div className="md:col-span-2"><StageBadge stage={lead.stage} /></div>
-                <div className="text-sm text-muted-foreground md:col-span-2">
-                  {lead.service ?? "—"}
-                  <span className="mt-1 block"><PriorityTag priority={lead.priority} /></span>
-                </div>
-                <div className="text-sm md:col-span-2">
-                  {showMoney ? formatMoney(lead.proposedPrice ?? lead.budget) : "—"}
-                </div>
-                <div className="text-sm md:col-span-2 md:text-right">
-                  {lead.nextActionTitle ? (
-                    <>
-                      <span className="block truncate">{lead.nextActionTitle}</span>
-                      <span className="text-subtle-foreground">{formatDate(lead.nextActionAt)}</span>
-                    </>
-                  ) : (
-                    <span className="text-subtle-foreground">нет действия</span>
-                  )}
-                </div>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <Panel flush>
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="px-5">Лид</TableHead>
+                <TableHead>Этап</TableHead>
+                <TableHead className="hidden md:table-cell">Услуга</TableHead>
+                {showMoney ? <TableHead className="hidden lg:table-cell">Сумма</TableHead> : null}
+                {isAdmin ? <TableHead className="hidden lg:table-cell">Ответственный</TableHead> : null}
+                <TableHead className="hidden pr-5 text-right md:table-cell">Следующее действие</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filtered.map((lead) => (
+                <TableRow key={lead.id} className="group">
+                  <TableCell className="px-5">
+                    <Link href={`/admin/crm/leads/${lead.id}`} className="block">
+                      <span className="block font-medium group-hover:text-primary">
+                        {lead.company ?? `${lead.firstName} ${lead.lastName ?? ""}`}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {lead.company ? `${lead.firstName} ${lead.lastName ?? ""}` : lead.email ?? "—"}
+                      </span>
+                    </Link>
+                  </TableCell>
+                  <TableCell><StageBadge stage={lead.stage} /></TableCell>
+                  <TableCell className="hidden text-muted-foreground md:table-cell">
+                    {lead.service ?? "—"}
+                    <span className="mt-1 block"><PriorityTag priority={lead.priority} /></span>
+                  </TableCell>
+                  {showMoney ? (
+                    <TableCell className="hidden tabular lg:table-cell">
+                      {formatMoney(lead.proposedPrice ?? lead.budget)}
+                    </TableCell>
+                  ) : null}
+                  {isAdmin ? (
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
+                      {ownerName(lead.ownerId)}
+                    </TableCell>
+                  ) : null}
+                  <TableCell className="hidden pr-5 text-right md:table-cell">
+                    {lead.nextActionTitle ? (
+                      <>
+                        <span className="block max-w-56 truncate">{lead.nextActionTitle}</span>
+                        <span className="text-xs text-subtle-foreground">{formatDate(lead.nextActionAt)}</span>
+                      </>
+                    ) : (
+                      <span className="text-subtle-foreground">нет действия</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Panel>
       )}
     </div>
   );

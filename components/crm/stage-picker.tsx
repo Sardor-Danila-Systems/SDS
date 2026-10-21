@@ -34,10 +34,10 @@ export function StagePicker({
               })
             }
             className={cn(
-              "rounded-sm border px-2.5 py-1 text-xs transition-colors",
+              "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               active
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border text-muted-foreground hover:border-foreground hover:text-foreground",
+                ? "border-transparent bg-primary text-primary-foreground shadow-[var(--shadow-panel)]"
+                : "border-border bg-card text-muted-foreground hover:border-border-strong hover:text-foreground",
             )}
           >
             {STAGE_LABEL[option] ?? option}

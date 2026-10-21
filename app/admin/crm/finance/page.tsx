@@ -4,9 +4,10 @@ import { can } from "@/lib/crm/rbac";
 import {
   AuthzError, financeSummary, listExpenses, listProjects,
 } from "@/lib/crm/repo";
+import { ArrowDownToLine, ArrowUpFromLine, Hourglass, Scale, Wallet } from "lucide-react";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/types/crm";
 import {
-  CURRENCY_OPTIONS, DEFAULT_CURRENCY, EmptyState, PageHeader, Stat,
+  CURRENCY_OPTIONS, DEFAULT_CURRENCY, EmptyState, Panel, PageHeader, Stat,
   formatDate, formatMoney,
 } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
@@ -58,92 +59,96 @@ export default async function FinancePage() {
     amount === 0 ? "0" : formatMoney({ amount, currency });
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-6">
       <PageHeader
-        label="Работа"
         title="Финансы"
         hint="Поступления считаются из платежей по проектам, расходы вносятся здесь."
       />
 
       {summary.length === 0 ? (
         <EmptyState
+          icon={Wallet}
           title="Движений по деньгам пока нет"
           hint="Запишите платёж в карточке проекта или добавьте расход справа."
         />
       ) : (
         summary.map((fin) => (
-          <section key={fin.currency} className="space-y-8">
-            <h2 className="label border-b border-border pb-3">{fin.currency}</h2>
-            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-              <Stat value={money(fin.income, fin.currency)} label="Получено" tone="accent" />
-              <Stat value={money(fin.expenses, fin.currency)} label="Расходы" />
+          <section key={fin.currency} className="space-y-4">
+            <h2 className="text-sm font-semibold text-muted-foreground">Валюта: {fin.currency}</h2>
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              <Stat icon={ArrowDownToLine} value={money(fin.income, fin.currency)} label="Получено" tone="accent" />
+              <Stat icon={ArrowUpFromLine} value={money(fin.expenses, fin.currency)} label="Расходы" />
               <Stat
+                icon={Scale}
                 value={money(fin.balance, fin.currency)}
                 label="Баланс"
                 tone={fin.balance < 0 ? "warn" : "default"}
               />
-              <Stat value={money(fin.receivable, fin.currency)} label="Клиенты должны" />
+              <Stat icon={Hourglass} value={money(fin.receivable, fin.currency)} label="Клиенты должны" />
             </div>
 
-            <div className="grid gap-10 lg:grid-cols-2">
-              <div>
-                <p className="label mb-3">По месяцам</p>
-                <ul className="border-t border-border">
+            <div className="grid items-start gap-4 lg:grid-cols-2">
+              <Panel title="По месяцам" flush>
+                <ul className="divide-y divide-border">
                   {fin.months.map((m) => (
-                    <li key={m.month} className="flex justify-between border-b border-border py-3 text-sm">
+                    <li key={m.month} className="flex justify-between gap-4 px-5 py-3 text-sm">
                       <span>{monthLabel(m.month)}</span>
                       <span className="tabular text-muted-foreground">
-                        <span className="text-primary">+{money(m.income, fin.currency)}</span>
+                        <span className="font-medium text-[var(--success)]">+{money(m.income, fin.currency)}</span>
                         {" · "}−{money(m.expenses, fin.currency)}
                       </span>
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Panel>
 
-              <div>
-                <p className="label mb-3">По проектам</p>
+              <Panel title="По проектам" flush>
                 {fin.projects.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Проектов в этой валюте нет.</p>
+                  <p className="px-5 py-6 text-sm text-muted-foreground">Проектов в этой валюте нет.</p>
                 ) : (
-                  <ul className="border-t border-border">
-                    {fin.projects.map((p) => (
-                      <li key={p.id} className="border-b border-border py-3 text-sm">
-                        <div className="flex justify-between gap-4">
-                          <span>{p.name}</span>
-                          <span className="tabular">{money(p.paid, fin.currency)} из {money(p.total, fin.currency)}</span>
-                        </div>
-                        <p className="mt-1 text-xs text-subtle-foreground">
-                          расходы {money(p.spent, fin.currency)} · остаток {money(p.remaining, fin.currency)}
-                        </p>
-                      </li>
-                    ))}
+                  <ul className="divide-y divide-border">
+                    {fin.projects.map((p) => {
+                      const share = p.total > 0 ? Math.min(100, Math.round((p.paid / p.total) * 100)) : 0;
+                      return (
+                        <li key={p.id} className="px-5 py-3.5 text-sm">
+                          <div className="flex justify-between gap-4">
+                            <span className="font-medium">{p.name}</span>
+                            <span className="tabular text-muted-foreground">{share}%</span>
+                          </div>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-surface-2">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${share}%` }} />
+                          </div>
+                          <p className="mt-2 text-xs text-muted-foreground tabular">
+                            {money(p.paid, fin.currency)} из {money(p.total, fin.currency)} · расходы {money(p.spent, fin.currency)}
+                          </p>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
-              </div>
+              </Panel>
             </div>
           </section>
         ))
       )}
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
-        <section>
-          <h2 className="label border-b border-border pb-3">Расходы · {expenses.length}</h2>
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <Panel title={`Расходы · ${expenses.length}`} flush>
           {expenses.length === 0 ? (
-            <p className="mt-6 text-[0.9375rem] text-muted-foreground">Расходов пока нет.</p>
+            <p className="px-5 py-6 text-sm text-muted-foreground">Расходов пока нет.</p>
           ) : (
-            <ul>
+            <ul className="divide-y divide-border">
               {expenses.map((e) => (
-                <li key={e.id} className="flex items-start justify-between gap-4 border-b border-border py-4">
+                <li key={e.id} className="flex items-start justify-between gap-4 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="text-[0.9375rem]">{e.note ?? CATEGORY_LABEL[e.category]}</p>
-                    <p className="mt-1 text-xs text-subtle-foreground">
+                    <p className="text-sm font-medium">{e.note ?? CATEGORY_LABEL[e.category]}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatDate(e.paidAt)} · {CATEGORY_LABEL[e.category]}
                       {projectName(e.projectId) ? ` · ${projectName(e.projectId)}` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="tabular text-[0.9375rem]">
+                    <p className="text-sm font-medium tabular">
                       {formatMoney({ amount: e.amount, currency: e.currency })}
                     </p>
                     {canWrite ? <ExpenseDelete expenseId={e.id} /> : null}
@@ -152,12 +157,11 @@ export default async function FinancePage() {
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
         {canWrite ? (
-          <aside>
-            <h2 className="label border-b border-border pb-3">Новый расход</h2>
-            <div className="mt-6">
+          <aside className="lg:sticky lg:top-20">
+            <Panel title="Новый расход">
               <ActionForm action={addExpenseAction} submitLabel="Записать" pendingLabel="Записываем…">
                 <FieldRow>
                   <Field label="Сумма" name="amount" required placeholder="500 000" />
@@ -182,7 +186,7 @@ export default async function FinancePage() {
                 />
                 <Field label="Комментарий" name="note" placeholder="Хостинг на месяц" />
               </ActionForm>
-            </div>
+            </Panel>
           </aside>
         ) : null}
       </div>

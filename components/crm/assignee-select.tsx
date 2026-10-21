@@ -26,7 +26,7 @@ export function AssigneeSelect({
           await assignTaskOwnerAction(taskId, next);
         });
       }}
-      className="rounded-sm border border-border bg-background px-2 py-1 text-xs text-muted-foreground disabled:opacity-60"
+      className="rounded-lg border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground disabled:opacity-60"
     >
       {ownerId && !people.some((p) => p.id === ownerId) ? (
         <option value={ownerId}>—</option>
