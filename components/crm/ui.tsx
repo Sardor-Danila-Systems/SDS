@@ -227,6 +227,7 @@ export function PriorityTag({ priority }: { priority: Priority }) {
 export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   TODO: "К выполнению",
   IN_PROGRESS: "В работе",
+  REVIEW: "На проверке",
   DONE: "Готово",
   CANCELLED: "Отменена",
 };

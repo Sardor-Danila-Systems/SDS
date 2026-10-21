@@ -108,14 +108,14 @@ export default async function AdminDashboardPage() {
           icon={Clock3}
           value={String(dueToday.length)}
           label="Задач на сегодня"
-          href="/admin/crm/tasks"
+          href="/admin/tracker"
           tone={dueToday.length ? "accent" : "default"}
         />
         <Stat
           icon={CalendarClock}
           value={String(overdue.length)}
           label="Просроченных задач"
-          href="/admin/crm/tasks"
+          href="/admin/tracker"
           tone={overdue.length ? "warn" : "default"}
         />
       </section>
@@ -226,7 +226,7 @@ export default async function AdminDashboardPage() {
             {team.map((m) => (
               <li key={m.id}>
                 <Link
-                  href={`/admin/crm/tasks?user=${m.id}`}
+                  href={`/admin/tracker?owner=${m.id}`}
                   className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 px-5 py-3.5 transition-colors hover:bg-surface/60"
                 >
                   <span className="text-sm font-medium">{m.name}</span>
