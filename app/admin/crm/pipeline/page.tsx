@@ -18,7 +18,7 @@ export default async function PipelinePage() {
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader
         label="Продажи"
         title="Воронка"

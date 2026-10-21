@@ -27,9 +27,10 @@ export function Field({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-2.5", className)}>
+    <div className={cn("space-y-1.5", className)}>
       <Label htmlFor={name}>{label}</Label>
       <Input
+        className="h-10 rounded-lg bg-card text-sm"
         id={name}
         name={name}
         type={type}
@@ -57,9 +58,10 @@ export function TextField({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-2.5", className)}>
+    <div className={cn("space-y-1.5", className)}>
       <Label htmlFor={name}>{label}</Label>
       <Textarea
+        className="min-h-24 rounded-lg bg-card text-sm"
         id={name}
         name={name}
         rows={rows}
@@ -85,13 +87,13 @@ export function SelectField({
   className?: string;
 }) {
   return (
-    <div className={cn("space-y-2.5", className)}>
+    <div className={cn("space-y-1.5", className)}>
       <Label htmlFor={name}>{label}</Label>
       <select
         id={name}
         name={name}
         defaultValue={defaultValue}
-        className="flex h-12 w-full rounded-md border border-input bg-background px-4 text-[0.9375rem] text-foreground transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+        className="flex h-10 w-full rounded-lg border border-input bg-card px-3 text-sm text-foreground transition-colors focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>
@@ -104,5 +106,5 @@ export function SelectField({
 }
 
 export function FieldRow({ children }: { children: ReactNode }) {
-  return <div className="grid gap-5 sm:grid-cols-2">{children}</div>;
+  return <div className="grid gap-4 sm:grid-cols-2">{children}</div>;
 }

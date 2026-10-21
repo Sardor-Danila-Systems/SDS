@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { ThemeToggle } from "@/components/admin/theme-toggle";
 import { ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -41,18 +42,22 @@ export default function AdminLoginPage() {
     }
 
     return (
-        <div className="flex min-h-[70vh] items-center justify-center px-6">
+        <div className="flex min-h-dvh items-center justify-center px-4 py-10">
             <div className="w-full max-w-sm">
-                <div className="border-b border-border pb-6">
-                    <span className="label">SDS · Админка</span>
-                    <h1 className="display-3 mt-3">Вход</h1>
+                <div className="mb-8 flex flex-col items-center text-center">
+                    <span className="flex size-12 items-center justify-center rounded-xl bg-primary text-lg font-semibold text-primary-foreground shadow-[var(--shadow-pop)]">
+                        S
+                    </span>
+                    <h1 className="mt-5 text-2xl font-semibold tracking-[-0.03em]">Вход в SDS</h1>
+                    <p className="mt-1.5 text-sm text-muted-foreground">CRM и управление сайтом</p>
                 </div>
 
-                <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-                    <div className="space-y-2.5">
+                <form onSubmit={handleSubmit} className="admin-panel space-y-4 p-6">
+                    <div className="space-y-1.5">
                         <Label htmlFor="login">Логин</Label>
                         <Input
                             id="login"
+                            className="h-10 rounded-lg bg-card text-sm"
                             value={login}
                             onChange={(e) => setLogin(e.target.value)}
                             autoComplete="username"
@@ -60,11 +65,12 @@ export default function AdminLoginPage() {
                         />
                     </div>
 
-                    <div className="space-y-2.5">
+                    <div className="space-y-1.5">
                         <Label htmlFor="password">Пароль</Label>
                         <Input
                             id="password"
                             type="password"
+                            className="h-10 rounded-lg bg-card text-sm"
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             autoComplete="current-password"
@@ -73,7 +79,7 @@ export default function AdminLoginPage() {
                     </div>
 
                     {error ? (
-                        <p className="border-l-2 border-destructive pl-3 text-sm text-destructive">
+                        <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive" role="alert">
                             {error}
                         </p>
                     ) : null}
@@ -81,12 +87,16 @@ export default function AdminLoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="group inline-flex h-12 w-full items-center justify-center gap-2.5 rounded-md bg-primary px-6 text-[0.9375rem] font-medium text-primary-foreground transition-colors hover:bg-primary-hover disabled:opacity-60"
+                        className="group inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-[var(--shadow-panel)] transition-colors hover:bg-primary-hover disabled:opacity-60"
                     >
                         {loading ? "Входим…" : "Войти"}
-                        <ArrowRight className="size-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+                        <ArrowRight className="size-4 transition-transform duration-200 group-hover:translate-x-0.5" />
                     </button>
                 </form>
+
+                <div className="mt-6 flex justify-center">
+                    <ThemeToggle />
+                </div>
             </div>
         </div>
     );

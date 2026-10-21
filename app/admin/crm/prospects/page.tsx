@@ -6,7 +6,7 @@ import {
   CURRENCY_OPTIONS,
   DEFAULT_CURRENCY,
   EmptyState,
-  PageHeader,
+  Panel, PageHeader,
   SOURCE_LABEL,
   StageBadge,
   STAGE_LABEL,
@@ -50,40 +50,34 @@ export default async function ProspectsPage({
   });
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader
         label="Продажи"
         title="Кому написать"
         hint={`${prospects.length} компаний в списке`}
       />
 
-      <form className="flex flex-wrap items-end gap-4" method="get">
-        <div className="min-w-56 flex-1">
-          <label htmlFor="q" className="label">Поиск</label>
-          <input
-            id="q" name="q" defaultValue={q ?? ""}
-            placeholder="компания, контакт, город"
-            className="mt-2.5 flex h-11 w-full rounded-md border border-input bg-background px-4 text-[0.9375rem] focus-visible:border-ring focus-visible:outline-none"
-          />
-        </div>
-        <div>
-          <label htmlFor="stage" className="label">Этап</label>
-          <select
-            id="stage" name="stage" defaultValue={stage ?? ""}
-            className="mt-2.5 flex h-11 rounded-md border border-input bg-background px-4 text-[0.9375rem]"
-          >
-            <option value="">Все</option>
-            {PROSPECT_STAGES.map((s) => (
-              <option key={s} value={s}>{STAGE_LABEL[s] ?? s}</option>
-            ))}
-          </select>
-        </div>
-        <button type="submit" className="h-11 rounded-md border border-border-strong px-5 text-[0.9375rem] transition-colors hover:border-foreground">
+      <form className="flex flex-wrap items-center gap-3" method="get">
+        <input
+          id="q" name="q" defaultValue={q ?? ""} aria-label="Поиск"
+          placeholder="Компания, контакт, город"
+          className="h-10 min-w-56 flex-1 rounded-lg border border-input bg-card px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+        />
+        <select
+          name="stage" defaultValue={stage ?? ""} aria-label="Этап"
+          className="h-10 rounded-lg border border-input bg-card px-3 text-sm focus-visible:border-ring focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
+        >
+          <option value="">Все этапы</option>
+          {PROSPECT_STAGES.map((s) => (
+            <option key={s} value={s}>{STAGE_LABEL[s] ?? s}</option>
+          ))}
+        </select>
+        <button type="submit" className="h-10 rounded-lg border border-border-strong bg-card px-4 text-sm font-medium transition-colors hover:bg-surface">
           Применить
         </button>
       </form>
 
-      <section className="grid gap-12 lg:grid-cols-[1fr_22rem]">
+      <section className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
         <div>
           {filtered.length === 0 ? (
             <EmptyState
@@ -95,11 +89,12 @@ export default async function ProspectsPage({
               }
             />
           ) : (
-            <ul className="border-t border-border">
+            <Panel flush>
+            <ul className="divide-y divide-border">
               {filtered.map((p) => (
-                <li key={p.id} className="grid gap-3 border-b border-border py-5 md:grid-cols-12 md:items-baseline md:gap-6">
+                <li key={p.id} className="grid gap-3 px-5 py-4 md:grid-cols-12 md:items-baseline md:gap-6">
                   <div className="md:col-span-4">
-                    <p className="font-medium tracking-[-0.02em]">{p.company}</p>
+                    <p className="text-sm font-medium">{p.company}</p>
                     {p.contactName ? (
                       <p className="mt-1 text-sm text-muted-foreground">{p.contactName}</p>
                     ) : null}
@@ -132,12 +127,13 @@ export default async function ProspectsPage({
                 </li>
               ))}
             </ul>
+            </Panel>
           )}
         </div>
 
-        <aside>
-          <h2 className="label border-b border-border pb-3">Добавить</h2>
-          <div className="mt-6">
+        <aside className="lg:sticky lg:top-20">
+          <Panel title="Добавить">
+          <div>
             <ActionForm action={addProspectAction} submitLabel="Добавить" pendingLabel="Добавляем…">
               <Field label="Компания" name="company" required placeholder="Registon Coffee" />
               <Field label="Контакт" name="contactName" placeholder="Азиз" />
@@ -168,6 +164,7 @@ export default async function ProspectsPage({
               <TextField label="Заметки" name="notes" rows={2} />
             </ActionForm>
           </div>
+          </Panel>
         </aside>
       </section>
     </div>

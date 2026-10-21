@@ -3,9 +3,26 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import {
+  Briefcase,
+  CalendarDays,
+  CheckSquare,
+  Columns3,
+  FolderKanban,
+  Globe,
+  LayoutDashboard,
+  Menu,
+  Send,
+  Users,
+  UsersRound,
+  Wallet,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Role } from "@/types/crm";
 import { LogoutButton } from "./logout-button";
+import { ThemeToggle } from "./theme-toggle";
 
 /**
  * Admin navigation.
@@ -18,6 +35,7 @@ import { LogoutButton } from "./logout-button";
 interface NavItem {
   href: string;
   label: string;
+  icon: LucideIcon;
   /** Roles allowed to see it. Server checks still apply on every action. */
   roles?: Role[];
 }
@@ -27,39 +45,38 @@ interface NavGroup {
   items: NavItem[];
 }
 
-/*
-  Ordered by how often it is opened, not by how the data model is arranged:
-  leads and the funnel are the daily work, the register of companies to
-  approach is occasional. Proposals used to be a section of their own — the
-  price and the stage now live on the lead card, which is where the deal is.
-*/
 const GROUPS: NavGroup[] = [
-  { label: null, items: [{ href: "/admin", label: "Сегодня" }] },
+  {
+    label: null,
+    items: [{ href: "/admin", label: "Сегодня", icon: LayoutDashboard }],
+  },
   {
     label: "Продажи",
     items: [
-      { href: "/admin/crm/leads", label: "Лиды" },
-      { href: "/admin/crm/pipeline", label: "Воронка" },
-      { href: "/admin/crm/tasks", label: "Задачи" },
-      { href: "/admin/crm/meetings", label: "Встречи" },
-      { href: "/admin/crm/prospects", label: "Кому написать" },
+      { href: "/admin/crm/leads", label: "Лиды", icon: Users },
+      { href: "/admin/crm/pipeline", label: "Воронка", icon: Columns3 },
+      { href: "/admin/crm/tasks", label: "Задачи", icon: CheckSquare },
+      { href: "/admin/crm/meetings", label: "Встречи", icon: CalendarDays },
+      { href: "/admin/crm/prospects", label: "Кому написать", icon: Send },
     ],
   },
   {
     label: "Работа",
     items: [
-      { href: "/admin/crm/clients", label: "Клиенты" },
-      { href: "/admin/crm/projects", label: "Проекты" },
-      { href: "/admin/crm/finance", label: "Финансы", roles: ["ADMIN"] },
+      { href: "/admin/crm/clients", label: "Клиенты", icon: Briefcase },
+      { href: "/admin/crm/projects", label: "Проекты", icon: FolderKanban },
+      { href: "/admin/crm/finance", label: "Финансы", icon: Wallet, roles: ["ADMIN"] },
     ],
   },
   {
     label: "Управление",
-    items: [{ href: "/admin/team", label: "Команда", roles: ["ADMIN"] }],
+    items: [{ href: "/admin/team", label: "Команда", icon: UsersRound, roles: ["ADMIN"] }],
   },
   {
     label: "Сайт",
-    items: [{ href: "/admin/content", label: "Портфолио", roles: ["ADMIN"] }],
+    items: [
+      { href: "/admin/content", label: "Портфолио", icon: Globe, roles: ["ADMIN"] },
+    ],
   },
 ];
 
@@ -68,12 +85,57 @@ function isActive(pathname: string, href: string) {
   return pathname.startsWith(href);
 }
 
+function initials(name: string) {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]!.toUpperCase())
+    .join("");
+}
+
+const ROLE_LABEL: Record<Role, string> = {
+  ADMIN: "Админ",
+  SALES: "Отдел продаж",
+  DEVELOPER: "Разработчик",
+};
+
+function Brand() {
+  return (
+    <Link href="/admin" className="flex items-center gap-2.5 px-3">
+      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-[0.8125rem] font-semibold tracking-tight text-primary-foreground">
+        S
+      </span>
+      <span className="text-[0.9375rem] font-semibold tracking-[-0.02em]">
+        SDS <span className="font-normal text-muted-foreground">админка</span>
+      </span>
+    </Link>
+  );
+}
+
+function UserCard({ role, userName }: { role: Role; userName: string }) {
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-2.5 shadow-[var(--shadow-panel)]">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
+        {initials(userName)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium leading-tight">{userName}</p>
+        <p className="truncate text-xs text-muted-foreground">{ROLE_LABEL[role]}</p>
+      </div>
+      <LogoutButton />
+    </div>
+  );
+}
+
 export function AdminNav({
   role,
   userName,
+  mobileActions,
 }: {
   role: Role;
   userName: string;
+  mobileActions?: React.ReactNode;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -90,13 +152,16 @@ export function AdminNav({
   const links = (
     <>
       {groups.map((group) => (
-        <div key={group.label ?? "root"} className="mb-7 last:mb-0">
+        <div key={group.label ?? "root"} className="mb-5 last:mb-0">
           {group.label ? (
-            <p className="label mb-3 px-3">{group.label}</p>
+            <p className="mb-1.5 px-3 text-xs font-medium text-subtle-foreground">
+              {group.label}
+            </p>
           ) : null}
           <ul className="space-y-0.5">
             {group.items.map((item) => {
               const active = isActive(pathname, item.href);
+              const Icon = item.icon;
               return (
                 <li key={item.href}>
                   <Link
@@ -104,12 +169,13 @@ export function AdminNav({
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
-                      "flex rounded-md px-3 py-2 text-[0.9375rem] transition-colors",
+                      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-[0.875rem] transition-colors",
                       active
-                        ? "bg-surface font-medium text-foreground"
+                        ? "bg-primary-soft font-medium text-primary"
                         : "text-muted-foreground hover:bg-surface hover:text-foreground",
                     )}
                   >
+                    <Icon className="size-4 shrink-0" />
                     {item.label}
                   </Link>
                 </li>
@@ -124,39 +190,47 @@ export function AdminNav({
   return (
     <>
       {/* Desktop rail */}
-      <aside className="hidden w-56 shrink-0 border-r border-border lg:block">
-        <div className="sticky top-16 flex h-[calc(100dvh-4rem)] flex-col justify-between p-5">
-          <nav>{links}</nav>
-          <div className="border-t border-border pt-4">
-            <p className="px-3 text-sm">{userName}</p>
-            <p className="label mt-1 px-3">{role}</p>
-            <div className="mt-3 px-3">
-              <LogoutButton />
+      <aside className="hidden w-60 shrink-0 border-r border-border bg-[var(--sidebar)] lg:block">
+        <div className="sticky top-0 flex h-dvh flex-col justify-between gap-6 overflow-y-auto p-4">
+          <div>
+            <div className="mb-8 mt-1">
+              <Brand />
             </div>
+            <nav>{links}</nav>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs text-subtle-foreground">Тема</span>
+              <ThemeToggle />
+            </div>
+            <UserCard role={role} userName={userName} />
           </div>
         </div>
       </aside>
 
-      {/* Mobile: a disclosure above the content rather than a cramped rail */}
-      <div className="border-b border-border lg:hidden">
-        <button
-          type="button"
-          onClick={() => setOpen((v) => !v)}
-          aria-expanded={open}
-          className="flex w-full items-center justify-between px-6 py-3 text-[0.9375rem]"
-        >
-          Меню
-          <span className="label">{open ? "закрыть" : "открыть"}</span>
-        </button>
+      {/* Mobile: brand bar with a disclosure instead of a cramped rail */}
+      <div className="sticky top-0 z-40 border-b border-border bg-[var(--sidebar)] lg:hidden">
+        <div className="flex h-14 items-center justify-between px-4">
+          <Brand />
+          <div className="flex items-center gap-2">
+            {mobileActions}
+            <ThemeToggle />
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              aria-label={open ? "Закрыть меню" : "Открыть меню"}
+              className="inline-flex size-9 items-center justify-center rounded-lg border border-border bg-card"
+            >
+              {open ? <X className="size-4" /> : <Menu className="size-4" />}
+            </button>
+          </div>
+        </div>
         {open ? (
-          <div className="px-3 pb-5">
+          <div className="max-h-[calc(100dvh-3.5rem)] overflow-y-auto px-4 pb-5 pt-2">
             <nav>{links}</nav>
-            <div className="mt-4 border-t border-border px-3 pt-4">
-              <p className="text-sm">{userName}</p>
-              <p className="label mt-1">{role}</p>
-              <div className="mt-3">
-                <LogoutButton />
-              </div>
+            <div className="mt-4">
+              <UserCard role={role} userName={userName} />
             </div>
           </div>
         ) : null}

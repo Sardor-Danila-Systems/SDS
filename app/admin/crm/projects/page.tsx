@@ -6,7 +6,7 @@ import {
   AuthzError, listClients, listProjects, projectFinance,
 } from "@/lib/crm/repo";
 import {
-  CURRENCY_OPTIONS, DEFAULT_CURRENCY, EmptyState, PageHeader, formatDate, formatMoney,
+  CURRENCY_OPTIONS, DEFAULT_CURRENCY, EmptyState, Panel, PageHeader, formatDate, formatMoney,
 } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
@@ -45,7 +45,7 @@ export default async function ClientProjectsPage() {
   );
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader
         label="Работа"
         title="Проекты клиентов"
@@ -56,8 +56,8 @@ export default async function ClientProjectsPage() {
         }
       />
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
-        <div className="space-y-10">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <div className="space-y-6">
           {projects.length === 0 ? (
             <EmptyState
               title="Проектов пока нет"
@@ -67,10 +67,10 @@ export default async function ClientProjectsPage() {
             projects.map((project) => {
               const f = projectFinance(project);
               return (
-                <section key={project.id} className="border-t border-border-strong pt-6">
+                <Panel key={project.id}>
                   <div className="flex flex-wrap items-baseline justify-between gap-3">
                     <div>
-                      <h2 className="text-xl tracking-[-0.025em]">{project.name}</h2>
+                      <h2 className="text-base font-semibold tracking-[-0.02em]">{project.name}</h2>
                       <p className="mt-1 text-sm text-muted-foreground">
                         {clientName(project.clientId)}
                         {project.deadline ? ` · до ${formatDate(project.deadline)}` : ""}
@@ -78,10 +78,10 @@ export default async function ClientProjectsPage() {
                     </div>
                     {showMoney ? (
                       <div className="text-right">
-                        <p className="text-lg tabular">
+                        <p className="text-lg font-semibold tabular">
                           {formatMoney({ amount: f.remaining, currency: f.currency })}
                         </p>
-                        <p className="num mt-1 text-subtle-foreground">осталось</p>
+                        <p className="mt-0.5 text-xs text-subtle-foreground">осталось</p>
                       </div>
                     ) : null}
                   </div>
@@ -137,15 +137,15 @@ export default async function ClientProjectsPage() {
                       </div>
                     </div>
                   ) : null}
-                </section>
+                </Panel>
               );
             })
           )}
         </div>
 
-        <aside>
-          <h2 className="label border-b border-border pb-3">Новый проект</h2>
-          <div className="mt-6">
+        <aside className="lg:sticky lg:top-20">
+          <Panel title="Новый проект">
+          <div>
             {clients.length === 0 ? (
               <p className="text-[0.9375rem] text-muted-foreground">
                 Сначала переведите выигранный лид в клиента.{" "}
@@ -172,6 +172,7 @@ export default async function ClientProjectsPage() {
               </ActionForm>
             )}
           </div>
+          </Panel>
         </aside>
       </div>
     </div>

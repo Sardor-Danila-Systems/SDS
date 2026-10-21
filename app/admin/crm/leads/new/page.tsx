@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
-import { PageHeader, CURRENCY_OPTIONS, DEFAULT_CURRENCY, sourceOptions } from "@/components/crm/ui";
+import { PageHeader, Panel, CURRENCY_OPTIONS, DEFAULT_CURRENCY, sourceOptions } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
 import { addLeadAction } from "../../actions";
@@ -18,9 +18,10 @@ export default async function NewLeadPage() {
   if (!user) redirect("/admin/login");
 
   return (
-    <div className="max-w-2xl space-y-10">
-      <PageHeader label="Лиды" title="Новый лид" />
+    <div className="max-w-2xl space-y-6">
+      <PageHeader title="Новый лид" />
 
+      <Panel>
       <ActionForm
         action={addLeadAction}
         submitLabel="Создать лид"
@@ -68,6 +69,7 @@ export default async function NewLeadPage() {
           <Field label="Когда" name="nextActionAt" type="date" />
         </FieldRow>
       </ActionForm>
+      </Panel>
     </div>
   );
 }

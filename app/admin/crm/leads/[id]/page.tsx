@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, listAssignableUsers } from "@/lib/auth";
 import { canSeeFinance } from "@/lib/crm/rbac";
 import { AuthzError, activitiesFor, getLead } from "@/lib/crm/repo";
 import { ACTIVITY_KINDS, PRIORITIES } from "@/types/crm";
@@ -14,6 +14,7 @@ import {
   formatDate,
   formatDateTime,
   formatMoney,
+  Panel,
 } from "@/components/crm/ui";
 import { ActionButton, ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
@@ -39,9 +40,9 @@ const MANUAL_KINDS = ACTIVITY_KINDS.filter((k) =>
 
 function Row({ label, value }: { label: string; value?: string }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 border-b border-border py-3">
+    <div className="flex items-baseline justify-between gap-4 border-b border-border py-3 last:border-0">
       <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-right text-[0.9375rem]">{value || "—"}</span>
+      <span className="text-right text-sm">{value || "—"}</span>
     </div>
   );
 }
@@ -67,12 +68,17 @@ export default async function LeadPage({
 
   const timeline = await activitiesFor("lead", lead.id);
   const showMoney = canSeeFinance(user.role);
+  // Admin sees which salesperson owns the lead.
+  const ownerName =
+    user.role === "ADMIN"
+      ? (await listAssignableUsers()).find((u) => u.id === lead.ownerId)?.name ?? "не назначен"
+      : null;
   const fullName = [lead.firstName, lead.lastName].filter(Boolean).join(" ");
   const overdue =
     lead.nextActionAt && lead.nextActionAt.slice(0, 10) < new Date().toISOString().slice(0, 10);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <Link
         href="/admin/crm/leads"
         className="group inline-flex items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -81,12 +87,12 @@ export default async function LeadPage({
         Все лиды
       </Link>
 
-      <header className="border-b border-border pb-8">
+      <header className="admin-panel p-6">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <span className="label">{lead.company ? fullName : "Лид"}</span>
-            <h1 className="display-3 mt-3">{lead.company ?? fullName}</h1>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
+            <h1 className="text-[1.625rem] font-semibold leading-tight tracking-[-0.03em]">{lead.company ?? fullName}</h1>
+            {lead.company ? <p className="mt-1 text-sm text-muted-foreground">{fullName}</p> : null}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
               <StageBadge stage={lead.stage} />
               <span className="text-sm text-muted-foreground">
                 {lead.service ?? "услуга не указана"}
@@ -98,7 +104,7 @@ export default async function LeadPage({
             {lead.clientId ? (
               <Link
                 href="/admin/crm/clients"
-                className="text-[0.9375rem] font-medium text-primary"
+                className="text-sm font-medium text-primary"
               >
                 Клиент создан →
               </Link>
@@ -114,20 +120,19 @@ export default async function LeadPage({
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-6 border-t border-border pt-5">
           <p className="label mb-3">Этап</p>
           <StagePicker leadId={lead.id} stage={lead.stage} />
         </div>
       </header>
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
-        <div className="space-y-12">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <div className="space-y-6">
           {/* Next action — the thing that stops leads being forgotten. */}
-          <section>
-            <h2 className="label border-b border-border pb-3">Следующее действие</h2>
-            <div className="mt-5">
+          <Panel title="Следующее действие">
+            <div>
               {lead.nextActionTitle ? (
-                <p className="text-lg tracking-[-0.02em]">
+                <p className="text-base font-medium">
                   {lead.nextActionTitle}
                   <span className={overdue ? "ml-3 text-sm text-destructive" : "ml-3 text-sm text-muted-foreground"}>
                     {formatDate(lead.nextActionAt)}
@@ -135,7 +140,7 @@ export default async function LeadPage({
                   </span>
                 </p>
               ) : (
-                <p className="text-[0.9375rem] text-muted-foreground">
+                <p className="text-sm text-muted-foreground">
                   Не назначено — назначьте, чтобы лид не потерялся.
                 </p>
               )}
@@ -160,13 +165,11 @@ export default async function LeadPage({
                 </ActionForm>
               </div>
             </div>
-          </section>
+          </Panel>
 
           {/* Timeline */}
-          <section>
-            <h2 className="label border-b border-border pb-3">История</h2>
-
-            <div className="mt-5 max-w-lg">
+          <Panel title="История">
+            <div className="max-w-lg">
               <ActionForm
                 action={addActivityAction.bind(null, lead.id)}
                 submitLabel="Записать"
@@ -184,19 +187,19 @@ export default async function LeadPage({
             </div>
 
             {timeline.length === 0 ? (
-              <p className="mt-8 text-[0.9375rem] text-muted-foreground">
+              <p className="mt-6 text-sm text-muted-foreground">
                 Пока ничего не записано.
               </p>
             ) : (
-              <ol className="mt-8 border-t border-border">
+              <ol className="mt-6 divide-y divide-border border-t border-border">
                 {timeline.map((entry) => (
-                  <li key={entry.id} className="grid gap-1 border-b border-border py-4 sm:grid-cols-12 sm:gap-4">
-                    <div className="num text-subtle-foreground sm:col-span-3">
+                  <li key={entry.id} className="grid gap-1 py-3.5 sm:grid-cols-12 sm:gap-4">
+                    <div className="text-xs tabular text-subtle-foreground sm:col-span-3">
                       {formatDateTime(entry.createdAt)}
                     </div>
                     <div className="sm:col-span-9">
-                      <p className="text-[0.9375rem]">
-                        <span className="label mr-2 inline">{KIND_LABEL[entry.kind] ?? entry.kind}</span>
+                      <p className="text-sm">
+                        <span className="mr-2 inline-flex rounded-full bg-surface px-2 py-0.5 text-xs font-medium text-muted-foreground">{KIND_LABEL[entry.kind] ?? entry.kind}</span>
                         {entry.summary}
                       </p>
                       {entry.detail ? (
@@ -208,13 +211,12 @@ export default async function LeadPage({
                 ))}
               </ol>
             )}
-          </section>
+          </Panel>
         </div>
 
-        <aside className="space-y-10">
-          <section>
-            <h2 className="label border-b border-border pb-3">Контакты</h2>
-            <div className="mt-2">
+        <aside className="space-y-6">
+          <Panel title="Контакты">
+            <div className="-my-3">
               <Row label="Имя" value={fullName} />
               <Row label="Должность" value={lead.position} />
               <Row label="Телефон" value={lead.phone} />
@@ -222,12 +224,12 @@ export default async function LeadPage({
               <Row label="Telegram" value={lead.telegram} />
               <Row label="Город" value={lead.city} />
               <Row label="Откуда" value={SOURCE_LABEL[lead.source] ?? lead.source} />
+              {ownerName ? <Row label="Ответственный" value={ownerName} /> : null}
             </div>
-          </section>
+          </Panel>
 
-          <section>
-            <h2 className="label border-b border-border pb-3">Проект</h2>
-            <div className="mt-2">
+          <Panel title="Проект">
+            <div className="-my-3">
               <Row label="Услуга" value={lead.service} />
               <Row label="Сроки" value={lead.timeline} />
               <Row label="Приоритет" value={PRIORITY_LABEL[lead.priority]} />
@@ -239,11 +241,10 @@ export default async function LeadPage({
               ) : null}
               <Row label="Создан" value={formatDate(lead.createdAt)} />
             </div>
-          </section>
+          </Panel>
 
-          <section>
-            <h2 className="label border-b border-border pb-3">Редактировать</h2>
-            <div className="mt-5">
+          <Panel title="Редактировать">
+            <div>
               <ActionForm
                 action={updateLeadAction.bind(null, lead.id)}
                 resetOnSuccess={false}
@@ -272,7 +273,7 @@ export default async function LeadPage({
                 <TextField label="Заметки" name="notes" defaultValue={lead.notes} rows={2} />
               </ActionForm>
             </div>
-          </section>
+          </Panel>
         </aside>
       </div>
     </div>

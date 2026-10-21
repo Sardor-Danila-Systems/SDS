@@ -5,7 +5,7 @@ import { can } from "@/lib/crm/rbac";
 import { AuthzError, listLeads, listTasks } from "@/lib/crm/repo";
 import { PRIORITIES, type Task } from "@/types/crm";
 import {
-  EmptyState, PageHeader, PRIORITY_LABEL, PriorityTag, formatDate,
+  EmptyState, PageHeader, Panel, PRIORITY_LABEL, PriorityTag, formatDate,
 } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
@@ -59,25 +59,26 @@ export default async function TasksPage({
   function Group({ title, rows, tone }: { title: string; rows: Task[]; tone?: "warn" }) {
     if (rows.length === 0) return null;
     return (
-      <section>
-        <h2 className={tone === "warn" ? "label text-destructive" : "label"}>
-          {title} · {rows.length}
-        </h2>
-        <ul className="mt-3 border-t border-border">
+      <Panel
+        flush
+        title={<span className={tone === "warn" ? "text-destructive" : ""}>{title}</span>}
+        action={<span className="tabular text-xs text-muted-foreground">{rows.length}</span>}
+      >
+        <ul className="divide-y divide-border">
           {rows.map((task) => (
-            <li key={task.id} className="flex items-start gap-3 border-b border-border py-4">
+            <li key={task.id} className="flex items-start gap-3 px-5 py-4">
               <TaskToggle taskId={task.id} status={task.status} />
               <div className="min-w-0 flex-1">
-                <p className="text-[0.9375rem]">{task.title}</p>
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-subtle-foreground">
-                  <span className={tone === "warn" ? "text-destructive" : ""}>
+                <p className="text-sm font-medium">{task.title}</p>
+                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  <span className={tone === "warn" ? "font-medium text-destructive" : ""}>
                     {task.dueAt ? formatDate(task.dueAt) : "без срока"}
                   </span>
                   <PriorityTag priority={task.priority} />
                   {task.entityId && leadName(task.entityId) ? (
                     <Link
                       href={`/admin/crm/leads/${task.entityId}`}
-                      className="hover:text-foreground"
+                      className="text-primary hover:underline"
                     >
                       {leadName(task.entityId)}
                     </Link>
@@ -96,12 +97,12 @@ export default async function TasksPage({
             </li>
           ))}
         </ul>
-      </section>
+      </Panel>
     );
   }
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader
         label="Продажи"
         title={isAdmin ? "Задачи команды" : "Мои задачи"}
@@ -119,8 +120,8 @@ export default async function TasksPage({
         }
       />
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
-        <div className="space-y-10">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <div className="space-y-6">
           {open.length === 0 && done.length === 0 ? (
             <EmptyState title="Задач пока нет" hint="Добавьте первую — она появится и на дашборде." />
           ) : (
@@ -129,14 +130,13 @@ export default async function TasksPage({
               <Group title="Сегодня" rows={dueToday} />
               <Group title="Дальше" rows={upcoming} />
               {done.length > 0 ? (
-                <section>
-                  <h2 className="label">Выполнено</h2>
-                  <ul className="mt-3 border-t border-border">
+                <Panel flush title="Выполнено">
+                  <ul className="divide-y divide-border">
                     {done.map((task) => (
-                      <li key={task.id} className="flex items-start gap-3 border-b border-border py-4">
+                      <li key={task.id} className="flex items-start gap-3 px-5 py-3.5">
                         <TaskToggle taskId={task.id} status={task.status} />
                         <div>
-                          <p className="text-[0.9375rem] text-muted-foreground line-through">
+                          <p className="text-sm text-muted-foreground line-through">
                             {task.title}
                           </p>
                           {isAdmin ? (
@@ -148,17 +148,15 @@ export default async function TasksPage({
                       </li>
                     ))}
                   </ul>
-                </section>
+                </Panel>
               ) : null}
             </>
           )}
         </div>
 
-        <aside>
-          <h2 className="label border-b border-border pb-3">
-            {isAdmin ? "Поставить задачу" : "Новая задача"}
-          </h2>
-          <div className="mt-6">
+        <aside className="lg:sticky lg:top-20">
+          <Panel title={isAdmin ? "Поставить задачу" : "Новая задача"}>
+          <div>
             <ActionForm action={addTaskAction} submitLabel="Добавить" pendingLabel="Добавляем…">
               <Field label="Что сделать" name="title" required placeholder="Позвонить в ABC Coffee" />
               {isAdmin ? (
@@ -188,6 +186,7 @@ export default async function TasksPage({
               <TextField label="Описание" name="description" rows={2} />
             </ActionForm>
           </div>
+          </Panel>
         </aside>
       </div>
     </div>

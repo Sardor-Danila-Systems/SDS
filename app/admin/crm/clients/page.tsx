@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { AuthzError, listClients, listLeads } from "@/lib/crm/repo";
-import { EmptyState, PageHeader, formatDate } from "@/components/crm/ui";
+import { EmptyState, PageHeader, Panel, formatDate } from "@/components/crm/ui";
 
 /** Clients are created from won leads, never typed in twice. */
 export default async function ClientsPage() {
@@ -20,12 +20,12 @@ export default async function ClientsPage() {
   const wonWithoutClient = leads.filter((l) => l.stage === "WON" && !l.clientId);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-6">
       <PageHeader label="Работа" title="Клиенты" hint={`${clients.length} всего`} />
 
       {wonWithoutClient.length > 0 ? (
-        <div className="border-l-2 border-primary pl-4">
-          <p className="text-[0.9375rem]">
+        <div className="rounded-xl border border-primary/30 bg-primary-soft px-5 py-4">
+          <p className="text-sm font-medium">
             {wonWithoutClient.length} выигранных лидов ещё не переведены в клиентов.
           </p>
           <ul className="mt-2 space-y-1">
@@ -49,14 +49,15 @@ export default async function ClientsPage() {
           hint="Клиент появляется, когда лид переведён из выигранной сделки."
         />
       ) : (
-        <ul className="border-t border-border">
+        <Panel flush>
+        <ul className="divide-y divide-border">
           {clients.map((client) => (
             <li
               key={client.id}
-              className="grid gap-3 border-b border-border py-5 md:grid-cols-12 md:items-baseline md:gap-6"
+              className="grid gap-3 px-5 py-4 md:grid-cols-12 md:items-baseline md:gap-6"
             >
               <div className="md:col-span-4">
-                <p className="font-medium tracking-[-0.02em]">
+                <p className="text-sm font-medium">
                   {client.company ?? client.name}
                 </p>
                 {client.company ? (
@@ -76,6 +77,7 @@ export default async function ClientsPage() {
             </li>
           ))}
         </ul>
+        </Panel>
       )}
     </div>
   );

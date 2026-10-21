@@ -2,8 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { AuthzError, teamOverview } from "@/lib/crm/repo";
+import { CheckCircle2, ListChecks, TriangleAlert } from "lucide-react";
 import { ROLES } from "@/types/crm";
-import { EmptyState, PageHeader, Stat, formatDate } from "@/components/crm/ui";
+import { EmptyState, Panel, PageHeader, Stat, formatDate } from "@/components/crm/ui";
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, SelectField } from "@/components/crm/fields";
 import { UserActiveToggle } from "@/components/crm/user-active";
@@ -43,31 +44,30 @@ export default async function TeamPage() {
   );
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-6">
       <PageHeader
-        label="Управление"
         title="Команда"
         hint="Кто чем занят, что просрочено и что происходит в CRM."
       />
 
-      <section className="grid gap-x-8 gap-y-10 sm:grid-cols-3">
-        <Stat value={String(totals.open)} label="Открытых задач" href="/admin/crm/tasks" />
+      <section className="grid gap-4 sm:grid-cols-3">
+        <Stat icon={ListChecks} value={String(totals.open)} label="Открытых задач" href="/admin/crm/tasks" />
         <Stat
+          icon={TriangleAlert}
           value={String(totals.overdue)}
           label="Просрочено"
           tone={totals.overdue ? "warn" : "default"}
           href="/admin/crm/tasks"
         />
-        <Stat value={String(totals.done)} label="Выполнено за 7 дней" tone="accent" />
+        <Stat icon={CheckCircle2} value={String(totals.done)} label="Выполнено за 7 дней" tone="accent" />
       </section>
 
-      <section>
-        <h2 className="label border-b border-border pb-3">Сотрудники</h2>
-        <ul>
+      <Panel title="Сотрудники" flush>
+        <ul className="divide-y divide-border">
           {members.map((m) => (
             <li
               key={m.id}
-              className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 border-b border-border py-4"
+              className="flex flex-wrap items-center justify-between gap-x-8 gap-y-2 px-5 py-3.5"
             >
               <div className="min-w-0">
                 <Link
@@ -98,17 +98,16 @@ export default async function TeamPage() {
             </li>
           ))}
         </ul>
-      </section>
+      </Panel>
 
-      <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
-        <section>
-          <h2 className="label border-b border-border pb-3">Что происходит</h2>
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_22rem]">
+        <Panel title="Что происходит" flush>
           {feed.length === 0 ? (
             <EmptyState title="Пока тихо" hint="Здесь появятся действия сотрудников: задачи, лиды, платежи." />
           ) : (
-            <ul>
+            <ul className="divide-y divide-border">
               {feed.map((a) => (
-                <li key={a.id} className="border-b border-border py-3 text-sm">
+                <li key={a.id} className="px-5 py-3 text-sm">
                   <p>{a.summary}</p>
                   <p className="mt-1 text-xs text-subtle-foreground">
                     {a.actorName} · {formatDate(a.createdAt)}
@@ -117,11 +116,11 @@ export default async function TeamPage() {
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
-        <aside>
-          <h2 className="label border-b border-border pb-3">Новый аккаунт</h2>
-          <div className="mt-6">
+        <aside className="lg:sticky lg:top-20">
+          <Panel title="Новый аккаунт">
+          <div>
             <ActionForm action={createUserAction} submitLabel="Создать" pendingLabel="Создаём…">
               <Field label="Имя" name="name" required placeholder="Алиса Иванова" />
               <Field label="Логин" name="login" required placeholder="alisa" />
@@ -135,6 +134,7 @@ export default async function TeamPage() {
               Отдел продаж видит только свои задачи, лиды, воронку и клиентов — без финансов компании, портфолио и управления командой.
             </p>
           </div>
+          </Panel>
         </aside>
       </div>
     </div>

@@ -54,7 +54,7 @@ export function PipelineBoard({
   return (
     <div
       className={cn(
-        "-mx-6 overflow-x-auto px-6 pb-4 lg:-mx-10 lg:px-10",
+        "-mx-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
         pending && "opacity-80",
       )}
     >
@@ -81,19 +81,19 @@ export function PipelineBoard({
               onDragLeave={() => setOver((s) => (s === stage ? null : s))}
               onDrop={() => drop(stage)}
               className={cn(
-                "w-64 shrink-0 rounded-md border p-3 transition-colors",
+                "w-72 shrink-0 rounded-xl border p-3 transition-colors",
                 over === stage
                   ? "border-primary bg-primary-soft"
-                  : "border-border bg-surface/50",
+                  : "border-border bg-surface/60",
               )}
             >
-              <header className="flex items-baseline justify-between border-b border-border pb-2">
+              <header className="flex items-center justify-between px-1 pb-1">
                 <h2 className="label">{STAGE_LABEL[stage] ?? stage}</h2>
-                <span className="num text-subtle-foreground">{column.length}</span>
+                <span className="rounded-full bg-card px-2 py-0.5 text-xs tabular text-muted-foreground">{column.length}</span>
               </header>
 
               {showMoney && total > 0 ? (
-                <p className="mt-2 text-sm text-muted-foreground tabular">
+                <p className="px-1 text-xs text-muted-foreground tabular">
                   {formatMoney({ amount: total, currency })}
                 </p>
               ) : null}
@@ -106,12 +106,12 @@ export function PipelineBoard({
                       onDragStart={() => setDragging(lead.id)}
                       onDragEnd={() => setDragging(null)}
                       className={cn(
-                        "cursor-grab rounded-md border border-border bg-background p-3 active:cursor-grabbing",
+                        "cursor-grab rounded-lg border border-border bg-card p-3 shadow-[var(--shadow-panel)] transition-colors hover:border-border-strong active:cursor-grabbing",
                         dragging === lead.id && "opacity-40",
                       )}
                     >
                       <Link href={`/admin/crm/leads/${lead.id}`} className="block">
-                        <p className="text-[0.9375rem] font-medium leading-snug tracking-[-0.02em]">
+                        <p className="text-sm font-medium leading-snug">
                           {lead.company ??
                             `${lead.firstName} ${lead.lastName ?? ""}`.trim()}
                         </p>
@@ -142,7 +142,7 @@ export function PipelineBoard({
                 ))}
 
                 {column.length === 0 ? (
-                  <li className="rounded-md border border-dashed border-border px-3 py-6 text-center text-xs text-subtle-foreground">
+                  <li className="rounded-lg border border-dashed border-border-strong px-3 py-6 text-center text-xs text-subtle-foreground">
                     пусто
                   </li>
                 ) : null}
