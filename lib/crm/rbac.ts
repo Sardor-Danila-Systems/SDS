@@ -21,6 +21,9 @@ export const PERMISSIONS = [
   "project.write",
   "finance.view",
   "finance.write",
+  "finance.report",
+  "task.assign",
+  "team.view",
   "content.write",
   "users.manage",
 ] as const;

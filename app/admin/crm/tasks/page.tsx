@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { getSessionUser } from "@/lib/auth";
+import { getSessionUser, listAssignableUsers } from "@/lib/auth";
+import { can } from "@/lib/crm/rbac";
 import { AuthzError, listLeads, listTasks } from "@/lib/crm/repo";
 import { PRIORITIES, type Task } from "@/types/crm";
 import {
@@ -9,20 +10,37 @@ import {
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
 import { TaskToggle } from "@/components/crm/task-toggle";
+import { TaskStatusPicker } from "@/components/crm/task-status";
+import { AssigneeSelect } from "@/components/crm/assignee-select";
 import { addTaskAction } from "../actions";
 
-export default async function TasksPage() {
+export default async function TasksPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ user?: string }>;
+}) {
   const user = await getSessionUser();
   if (!user) redirect("/admin/login");
 
-  let tasks: Task[];
+  const isAdmin = can(user.role, "task.assign");
+  const { user: filterId } = await searchParams;
+
+  let allTasks: Task[];
   let leads;
   try {
-    [tasks, leads] = await Promise.all([listTasks(), listLeads()]);
+    [allTasks, leads] = await Promise.all([listTasks(), listLeads()]);
   } catch (error) {
     if (error instanceof AuthzError) redirect("/admin");
     throw error;
   }
+
+  const people = isAdmin
+    ? (await listAssignableUsers()).map((p) => ({ id: p.id, name: p.name }))
+    : [];
+  const personName = (id?: string) => people.find((p) => p.id === id)?.name;
+
+  const tasks =
+    isAdmin && filterId ? allTasks.filter((t) => t.ownerId === filterId) : allTasks;
 
   const today = new Date().toISOString().slice(0, 10);
   const open = tasks.filter((t) => t.status !== "DONE" && t.status !== "CANCELLED");
@@ -64,7 +82,16 @@ export default async function TasksPage() {
                       {leadName(task.entityId)}
                     </Link>
                   ) : null}
+                  {!isAdmin && task.createdById && task.createdById !== user!.id ? (
+                    <span>от {task.createdByName ?? "руководителя"}</span>
+                  ) : null}
                 </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <TaskStatusPicker taskId={task.id} status={task.status} />
+                  {isAdmin ? (
+                    <AssigneeSelect taskId={task.id} ownerId={task.ownerId} people={people} />
+                  ) : null}
+                </div>
               </div>
             </li>
           ))}
@@ -75,7 +102,22 @@ export default async function TasksPage() {
 
   return (
     <div className="space-y-10">
-      <PageHeader label="Продажи" title="Задачи" hint={`${open.length} открытых`} />
+      <PageHeader
+        label="Продажи"
+        title={isAdmin ? "Задачи команды" : "Мои задачи"}
+        hint={
+          isAdmin && filterId
+            ? `${open.length} открытых у ${personName(filterId) ?? "сотрудника"}`
+            : `${open.length} открытых`
+        }
+        action={
+          isAdmin && filterId ? (
+            <Link href="/admin/crm/tasks" className="text-sm text-muted-foreground hover:text-foreground">
+              Показать все
+            </Link>
+          ) : null
+        }
+      />
 
       <div className="grid gap-12 lg:grid-cols-[1fr_22rem]">
         <div className="space-y-10">
@@ -93,9 +135,16 @@ export default async function TasksPage() {
                     {done.map((task) => (
                       <li key={task.id} className="flex items-start gap-3 border-b border-border py-4">
                         <TaskToggle taskId={task.id} status={task.status} />
-                        <p className="text-[0.9375rem] text-muted-foreground line-through">
-                          {task.title}
-                        </p>
+                        <div>
+                          <p className="text-[0.9375rem] text-muted-foreground line-through">
+                            {task.title}
+                          </p>
+                          {isAdmin ? (
+                            <p className="mt-1 text-xs text-subtle-foreground">
+                              {personName(task.ownerId) ?? "—"}
+                            </p>
+                          ) : null}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -106,10 +155,18 @@ export default async function TasksPage() {
         </div>
 
         <aside>
-          <h2 className="label border-b border-border pb-3">Новая задача</h2>
+          <h2 className="label border-b border-border pb-3">
+            {isAdmin ? "Поставить задачу" : "Новая задача"}
+          </h2>
           <div className="mt-6">
             <ActionForm action={addTaskAction} submitLabel="Добавить" pendingLabel="Добавляем…">
               <Field label="Что сделать" name="title" required placeholder="Позвонить в ABC Coffee" />
+              {isAdmin ? (
+                <SelectField
+                  label="Исполнитель" name="ownerId" defaultValue={filterId ?? user.id}
+                  options={people.map((p) => ({ value: p.id, label: p.name }))}
+                />
+              ) : null}
               <FieldRow>
                 <Field label="Срок" name="dueAt" type="date" />
                 <SelectField

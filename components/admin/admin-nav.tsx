@@ -50,12 +50,16 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/crm/clients", label: "Клиенты" },
       { href: "/admin/crm/projects", label: "Проекты" },
-      { href: "/admin/crm/finance", label: "Финансы", roles: ["ADMIN", "SALES"] },
+      { href: "/admin/crm/finance", label: "Финансы", roles: ["ADMIN"] },
     ],
   },
   {
+    label: "Управление",
+    items: [{ href: "/admin/team", label: "Команда", roles: ["ADMIN"] }],
+  },
+  {
     label: "Сайт",
-    items: [{ href: "/admin/content", label: "Портфолио" }],
+    items: [{ href: "/admin/content", label: "Портфолио", roles: ["ADMIN"] }],
   },
 ];
 

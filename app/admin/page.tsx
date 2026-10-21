@@ -28,7 +28,10 @@ export default async function AdminDashboardPage() {
 
   const leads = crm.leads.filter((l) => !l.deletedAt);
   const prospects = crm.prospects.filter((p) => !p.deletedAt);
-  const tasks = crm.tasks.filter((t) => !t.deletedAt);
+  // Admin sees the whole team's tasks; everyone else only their own.
+  const tasks = crm.tasks.filter(
+    (t) => !t.deletedAt && (user.role === "ADMIN" || t.ownerId === user.id),
+  );
 
   const today = new Date().toISOString().slice(0, 10);
   // Retired stages are included so a lead saved under one still counts.

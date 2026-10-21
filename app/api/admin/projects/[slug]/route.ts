@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { isAuthed } from "@/lib/auth";
+import { canEditContent } from "@/lib/auth";
 import {
   ProjectsStoreError,
   deleteProjectBySlug,
@@ -15,7 +15,7 @@ export async function PUT(
   request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  if (!(await isAuthed())) {
+  if (!(await canEditContent())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -71,7 +71,7 @@ export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ slug: string }> },
 ) {
-  if (!(await isAuthed())) {
+  if (!(await canEditContent())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

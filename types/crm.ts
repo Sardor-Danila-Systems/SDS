@@ -146,7 +146,8 @@ export type EntityType =
   | "client"
   | "project"
   | "task"
-  | "expense";
+  | "expense"
+  | "user";
 
 export interface User {
   id: string;
@@ -304,7 +305,10 @@ export interface Task {
   status: TaskStatus;
   priority: Priority;
   dueAt?: string;
+  /** The assignee. Sales and developers only ever see tasks they own. */
   ownerId?: string;
+  createdById?: string;
+  createdByName?: string;
   entityType?: EntityType;
   entityId?: string;
   createdAt: string;

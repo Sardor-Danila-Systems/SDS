@@ -3,6 +3,7 @@ import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import type { Role, User } from "@/types/crm";
+import { can } from "./crm/rbac";
 import { readCrm, mutateCrm } from "./crm/store";
 
 const COOKIE_NAME = "admin_session";
@@ -68,16 +69,30 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
   try {
     const { payload } = await jwtVerify(token, secret);
     if (!payload.sub || !payload.role) return null;
-    return {
+    const session: SessionUser = {
       id: String(payload.sub),
       name: String(payload.name ?? payload.login ?? "—"),
       login: String(payload.login ?? ""),
       role: payload.role as Role,
     };
+    if (session.id === BOOTSTRAP_ID) return session;
+
+    // A deactivated account must stop working now, not when its cookie
+    // expires, and a changed role applies on the next request.
+    const { users } = await readCrm();
+    const stored = users.find((u) => u.id === session.id);
+    if (!stored?.active) return null;
+    return { ...session, name: stored.name, role: stored.role };
   } catch {
     return null;
   }
 });
+
+/** Editing the public site's content is the admin's job, not the sales team's. */
+export async function canEditContent() {
+  const user = await getSessionUser();
+  return user !== null && can(user.role, "content.write");
+}
 
 export async function isAuthed() {
   return (await getSessionUser()) !== null;
@@ -151,7 +166,8 @@ export async function authenticate(
   }
 
   const { users } = await readCrm();
-  const user = users.find((u) => u.login === login && u.active);
+  const wanted = login.trim().toLowerCase();
+  const user = users.find((u) => u.login.toLowerCase() === wanted && u.active);
   if (!user?.passwordHash || !user.passwordSalt) return null;
 
   const hash = await hashPassword(password, user.passwordSalt);
