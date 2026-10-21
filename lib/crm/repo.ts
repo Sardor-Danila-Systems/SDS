@@ -1,6 +1,11 @@
 import "server-only";
 import { cache } from "react";
-import { getSessionUser, type SessionUser } from "@/lib/auth";
+import {
+  createSalt,
+  getSessionUser,
+  hashPassword,
+  type SessionUser,
+} from "@/lib/auth";
 import { can, type Permission } from "./rbac";
 import { mutateCrm, readCrm } from "./store";
 import type {
@@ -18,7 +23,9 @@ import type {
   Proposal,
   ProposalStatus,
   Prospect,
+  Role,
   Task,
+  User,
 } from "@/types/crm";
 
 /*
@@ -89,9 +96,18 @@ export async function listClients() {
   return alive(clients).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** Admin sees every task; everyone else sees the ones assigned to them. */
+function visibleTasks(user: SessionUser, tasks: Task[]) {
+  const rows = alive(tasks);
+  return can(user.role, "task.assign")
+    ? rows
+    : rows.filter((task) => task.ownerId === user.id);
+}
+
 export async function listTasks() {
+  const user = await requirePermission("crm.view");
   const { tasks } = await getCrm();
-  return alive(tasks);
+  return visibleTasks(user, tasks);
 }
 
 export async function listMeetings() {
@@ -105,7 +121,7 @@ export async function listProjects() {
 }
 
 export async function listExpenses() {
-  await requirePermission("finance.view");
+  await requirePermission("finance.report");
   const { expenses } = await getCrm();
   return alive(expenses).sort((a, b) => b.paidAt.localeCompare(a.paidAt));
 }
@@ -532,10 +548,28 @@ export async function createClientProject(input: {
 
 /* ---------------------------------- tasks --------------------------------- */
 
+function userName(data: CrmData, userId?: string) {
+  if (!userId) return "без исполнителя";
+  return (
+    data.users.find((u) => u.id === userId)?.name ??
+    (userId === "bootstrap-admin" ? "Администратор" : "неизвестный")
+  );
+}
+
 export async function createTask(input: Partial<Task> & { title: string }) {
   const actor = await requirePermission("task.write");
+  const mayAssign = can(actor.role, "task.assign");
 
   return mutateCrm((data) => {
+    const ownerId = mayAssign ? (input.ownerId ?? actor.id) : actor.id;
+    if (
+      ownerId !== actor.id &&
+      ownerId !== "bootstrap-admin" &&
+      !data.users.some((u) => u.id === ownerId && u.active)
+    ) {
+      throw new Error("Исполнитель не найден.");
+    }
+
     const task: Task = {
       id: id(),
       title: input.title.trim(),
@@ -543,36 +577,68 @@ export async function createTask(input: Partial<Task> & { title: string }) {
       status: input.status ?? "TODO",
       priority: input.priority ?? "MEDIUM",
       dueAt: input.dueAt,
-      ownerId: input.ownerId ?? actor.id,
+      ownerId,
+      createdById: actor.id,
+      createdByName: actor.name,
       entityType: input.entityType,
       entityId: input.entityId,
       createdAt: now(),
       updatedAt: now(),
     };
     data.tasks.push(task);
+
+    log(data, actor, {
+      kind: "CREATED",
+      entityType: "task",
+      entityId: task.id,
+      summary:
+        ownerId === actor.id
+          ? `Задача: ${task.title}`
+          : `Задача для ${userName(data, ownerId)}: ${task.title}`,
+    });
     return task;
   });
 }
 
 export async function updateTask(taskId: string, patch: Partial<Task>) {
   const actor = await requirePermission("task.write");
+  const mayAssign = can(actor.role, "task.assign");
 
   return mutateCrm((data) => {
-    const task = data.tasks.find((t) => t.id === taskId);
-    if (!task) throw new Error("Задача не найдена.");
+    const task = data.tasks.find((t) => t.id === taskId && !t.deletedAt);
+    if (!task || (!mayAssign && task.ownerId !== actor.id)) {
+      // The same answer for "missing" and "not yours" — no probing by id.
+      throw new Error("Задача не найдена.");
+    }
 
-    const completing = patch.status === "DONE" && task.status !== "DONE";
-    Object.assign(task, patch, { updatedAt: now() });
-    if (completing) {
-      task.completedAt = now();
-      if (task.entityType && task.entityId) {
-        log(data, actor, {
-          kind: "TASK_COMPLETED",
-          entityType: task.entityType,
-          entityId: task.entityId,
-          summary: `Задача выполнена: ${task.title}`,
-        });
-      }
+    // Only whoever hands out the work may move it to someone else.
+    const { ownerId, ...rest } = patch;
+    const safe: Partial<Task> = mayAssign ? { ...rest, ownerId } : rest;
+    if (!mayAssign || ownerId === undefined) delete safe.ownerId;
+
+    const previous = task.status;
+    const completing = safe.status === "DONE" && previous !== "DONE";
+    Object.assign(task, safe, { updatedAt: now() });
+    if (completing) task.completedAt = now();
+    if (safe.status && safe.status !== "DONE") task.completedAt = undefined;
+
+    if (safe.status && safe.status !== previous) {
+      log(data, actor, {
+        kind: completing ? "TASK_COMPLETED" : "STATUS_CHANGE",
+        entityType: "task",
+        entityId: task.id,
+        summary: `${task.title}: ${previous} → ${task.status}`,
+        from: previous,
+        to: task.status,
+      });
+    }
+    if (completing && task.entityType && task.entityId) {
+      log(data, actor, {
+        kind: "TASK_COMPLETED",
+        entityType: task.entityType,
+        entityId: task.entityId,
+        summary: `Задача выполнена: ${task.title}`,
+      });
     }
     return task;
   });
@@ -855,7 +921,7 @@ export interface CurrencyFinance {
  * together. The only place these totals are computed besides `projectFinance`.
  */
 export async function financeSummary(): Promise<CurrencyFinance[]> {
-  await requirePermission("finance.view");
+  await requirePermission("finance.report");
   const { projects, expenses } = await getCrm();
   const liveProjects = alive(projects);
   const liveExpenses = alive(expenses);
@@ -942,16 +1008,20 @@ export interface Notification {
  * computed means they can never drift from the records they describe.
  */
 export async function listNotifications(): Promise<Notification[]> {
+  const user = await requirePermission("crm.view");
   const data = await getCrm();
   const today = new Date().toISOString().slice(0, 10);
   const out: Notification[] = [];
 
-  for (const task of alive(data.tasks)) {
+  for (const task of visibleTasks(user, data.tasks)) {
     if (task.status === "DONE" || task.status === "CANCELLED") continue;
     if (task.dueAt && task.dueAt.slice(0, 10) < today) {
+      const who = can(user.role, "task.assign")
+        ? ` (${userName(data, task.ownerId)})`
+        : "";
       out.push({
         id: `task-${task.id}`,
-        text: `Задача просрочена: ${task.title}`,
+        text: `Задача просрочена: ${task.title}${who}`,
         href: "/admin/crm/tasks",
         tone: "warn",
       });
@@ -1055,4 +1125,124 @@ export async function searchCrm(query: string): Promise<SearchHit[]> {
   }
 
   return out.slice(0, 20);
+}
+
+/* ---------------------------------- team ---------------------------------- */
+
+export interface TeamMember {
+  id: string;
+  name: string;
+  login: string;
+  role: Role;
+  active: boolean;
+  open: number;
+  inProgress: number;
+  overdue: number;
+  doneLastWeek: number;
+}
+
+/** What each person is working on — the admin's view of the whole team. */
+export async function teamOverview() {
+  await requirePermission("team.view");
+  const data = await getCrm();
+  const today = new Date().toISOString().slice(0, 10);
+  const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const tasks = alive(data.tasks);
+
+  const people: Pick<TeamMember, "id" | "name" | "login" | "role" | "active">[] = [
+    {
+      id: "bootstrap-admin",
+      name: "Администратор",
+      login: process.env.ADMIN_LOGIN ?? "admin",
+      role: "ADMIN",
+      active: true,
+    },
+    ...data.users.map((u) => ({
+      id: u.id,
+      name: u.name,
+      login: u.login,
+      role: u.role,
+      active: u.active,
+    })),
+  ];
+
+  const members: TeamMember[] = people.map((person) => {
+    const mine = tasks.filter((t) => t.ownerId === person.id);
+    const open = mine.filter((t) => t.status === "TODO" || t.status === "IN_PROGRESS");
+    return {
+      ...person,
+      open: open.length,
+      inProgress: open.filter((t) => t.status === "IN_PROGRESS").length,
+      overdue: open.filter((t) => t.dueAt && t.dueAt.slice(0, 10) < today).length,
+      doneLastWeek: mine.filter(
+        (t) => t.status === "DONE" && (t.completedAt ?? "") >= weekAgo,
+      ).length,
+    };
+  });
+
+  const feed = [...data.activities]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 30);
+
+  return { members, feed };
+}
+
+export async function createTeamUser(input: {
+  name: string;
+  login: string;
+  password: string;
+  role: Role;
+}) {
+  const actor = await requirePermission("users.manage");
+  if (input.password.length < 8) {
+    throw new Error("Пароль должен быть не короче 8 символов.");
+  }
+  const login = input.login.trim().toLowerCase();
+  if (login === (process.env.ADMIN_LOGIN ?? "admin").toLowerCase()) {
+    throw new Error("Этот логин занят.");
+  }
+
+  const salt = createSalt();
+  const passwordHash = await hashPassword(input.password, salt);
+
+  return mutateCrm((data) => {
+    if (data.users.some((u) => u.login.toLowerCase() === login)) {
+      throw new Error("Этот логин занят.");
+    }
+    const user: User = {
+      id: id(),
+      name: input.name.trim(),
+      login,
+      role: input.role,
+      passwordHash,
+      passwordSalt: salt,
+      active: true,
+      createdAt: now(),
+    };
+    data.users.push(user);
+    log(data, actor, {
+      kind: "CREATED",
+      entityType: "user",
+      entityId: user.id,
+      summary: `Создан аккаунт: ${user.name} (${user.role})`,
+    });
+    return user;
+  });
+}
+
+export async function setUserActive(userId: string, active: boolean) {
+  const actor = await requirePermission("users.manage");
+
+  return mutateCrm((data) => {
+    const user = data.users.find((u) => u.id === userId);
+    if (!user) throw new Error("Пользователь не найден.");
+    user.active = active;
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "user",
+      entityId: user.id,
+      summary: `${active ? "Аккаунт включён" : "Аккаунт отключён"}: ${user.name}`,
+    });
+    return user;
+  });
 }

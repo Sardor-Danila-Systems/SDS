@@ -6,6 +6,8 @@ import {
   AuthzError,
   addLeadActivity,
   addExpense,
+  createTeamUser,
+  setUserActive,
   addPayment,
   deleteExpense,
   createClientProject,
@@ -26,7 +28,9 @@ import {
 import { CrmStoreError } from "@/lib/crm/store";
 import {
   EXPENSE_CATEGORIES,
+  ROLES,
   type ExpenseCategory,
+  type Role,
 } from "@/types/crm";
 import type {
   ActivityKind,
@@ -242,6 +246,7 @@ export async function addTaskAction(form: FormData): Promise<ActionResult> {
       dueAt: text(form, "dueAt"),
       entityType: text(form, "entityType") as "lead" | undefined,
       entityId: text(form, "entityId"),
+      ownerId: text(form, "ownerId"),
     }),
   );
 }
@@ -385,4 +390,34 @@ export async function deleteExpenseAction(
   expenseId: string,
 ): Promise<ActionResult> {
   return run(() => deleteExpense(expenseId));
+}
+
+/* ---------------------------------- team ---------------------------------- */
+
+export async function assignTaskOwnerAction(
+  taskId: string,
+  ownerId: string,
+): Promise<ActionResult> {
+  return run(() => updateTask(taskId, { ownerId }));
+}
+
+export async function createUserAction(form: FormData): Promise<ActionResult> {
+  const name = text(form, "name");
+  const login = text(form, "login");
+  const password = text(form, "password");
+  const role = text(form, "role") as Role | undefined;
+  if (!name || !login || !password) {
+    return { ok: false, error: "Укажите имя, логин и пароль." };
+  }
+  if (!role || !ROLES.includes(role)) {
+    return { ok: false, error: "Выберите роль." };
+  }
+  return run(() => createTeamUser({ name, login, password, role }));
+}
+
+export async function setUserActiveAction(
+  userId: string,
+  active: boolean,
+): Promise<ActionResult> {
+  return run(() => setUserActive(userId, active));
 }

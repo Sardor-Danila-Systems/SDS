@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { isAuthed } from "@/lib/auth";
+import { canEditContent } from "@/lib/auth";
 import {
   ProjectsStoreError,
   readProjects,
@@ -17,7 +17,7 @@ import type { Project } from "@/types/project";
  * here so the route is safe on its own.
  */
 export async function POST(request: Request) {
-  if (!(await isAuthed())) {
+  if (!(await canEditContent())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

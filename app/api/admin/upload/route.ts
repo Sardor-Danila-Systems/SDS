@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
-import { isAuthed } from "@/lib/auth";
+import { canEditContent } from "@/lib/auth";
 
 /**
  * Image upload for the project form. Takes multipart `file`, returns
@@ -11,7 +11,7 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/avif"];
 
 export async function POST(request: Request) {
-  if (!(await isAuthed())) {
+  if (!(await canEditContent())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
