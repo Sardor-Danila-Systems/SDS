@@ -322,3 +322,25 @@ export function formatMoney(money?: { amount: number; currency: string }) {
     maximumFractionDigits: 0,
   }).format(money.amount);
 }
+
+/**
+ * Sums of money in several currencies. Amounts in different currencies are
+ * never added together — each currency gets its own total.
+ */
+export function sumByCurrency(
+  items: ({ amount: number; currency: string } | undefined)[],
+): { amount: number; currency: string }[] {
+  const totals = new Map<string, number>();
+  for (const item of items) {
+    if (!item?.amount) continue;
+    const currency = item.currency || DEFAULT_CURRENCY;
+    totals.set(currency, (totals.get(currency) ?? 0) + item.amount);
+  }
+  return [...totals].map(([currency, amount]) => ({ amount, currency }));
+}
+
+/** "95 000 000 UZS · 4 700 $" — or a dash when there is nothing. */
+export function formatTotals(totals: { amount: number; currency: string }[]) {
+  if (totals.length === 0) return "—";
+  return totals.map((money) => formatMoney(money)).join(" · ");
+}

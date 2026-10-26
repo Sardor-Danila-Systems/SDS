@@ -4,7 +4,7 @@ import { useOptimistic, useState, useTransition } from "react";
 import Link from "next/link";
 import { PIPELINE_STAGES, pipelineColumn, type Lead, type LeadStage } from "@/types/crm";
 import { cn } from "@/lib/utils";
-import { STAGE_LABEL, formatDate, formatMoney } from "./ui";
+import { STAGE_LABEL, formatDate, formatMoney, formatTotals, sumByCurrency } from "./ui";
 import { setLeadStageAction } from "@/app/admin/crm/actions";
 
 /**
@@ -63,13 +63,9 @@ export function PipelineBoard({
           const column = items.filter(
             (lead) => pipelineColumn(lead.stage) === stage,
           );
-          const total = column.reduce(
-            (sum, lead) =>
-              sum + (lead.proposedPrice?.amount ?? lead.budget?.amount ?? 0),
-            0,
+          const totals = sumByCurrency(
+            column.map((lead) => lead.proposedPrice ?? lead.budget),
           );
-          const currency =
-            column[0]?.proposedPrice?.currency ?? column[0]?.budget?.currency ?? "UZS";
 
           return (
             <section
@@ -92,9 +88,9 @@ export function PipelineBoard({
                 <span className="rounded-full bg-card px-2 py-0.5 text-xs tabular text-muted-foreground">{column.length}</span>
               </header>
 
-              {showMoney && total > 0 ? (
+              {showMoney && totals.length > 0 ? (
                 <p className="px-1 text-xs text-muted-foreground tabular">
-                  {formatMoney({ amount: total, currency })}
+                  {formatTotals(totals)}
                 </p>
               ) : null}
 

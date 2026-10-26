@@ -263,7 +263,7 @@ export default async function LeadPage({
                 ) : null}
                 <SelectField
                   label="Валюта" name="currency"
-                  defaultValue={lead.budget?.currency ?? DEFAULT_CURRENCY}
+                  defaultValue={lead.proposedPrice?.currency ?? lead.budget?.currency ?? DEFAULT_CURRENCY}
                   options={CURRENCY_OPTIONS}
                 />
                 <SelectField
