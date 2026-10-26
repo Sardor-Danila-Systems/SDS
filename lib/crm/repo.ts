@@ -889,6 +889,8 @@ export async function updateClientProject(
   patch: Partial<ClientProject>,
 ) {
   const actor = await requirePermission("project.write");
+  // The price is money: whoever may edit the project may not necessarily change it.
+  if ("price" in patch) await requirePermission("finance.write");
 
   return mutateCrm((data) => {
     const project = data.projects.find((p) => p.id === projectId);
@@ -896,7 +898,22 @@ export async function updateClientProject(
 
     const statusChanged = patch.status && patch.status !== project.status;
     const previous = project.status;
+    const previousPrice = project.price;
     Object.assign(project, patch, { updatedAt: now() });
+
+    // A project is priced in one currency and its payments are entered in
+    // that same one, so changing it relabels them — otherwise income would be
+    // booked under a currency the project no longer has.
+    const currency = project.price?.currency;
+    if (currency && currency !== previousPrice?.currency) {
+      for (const payment of project.payments) payment.currency = currency;
+      log(data, actor, {
+        kind: "UPDATED",
+        entityType: "project",
+        entityId: project.id,
+        summary: `Валюта проекта: ${previousPrice?.currency ?? "—"} → ${currency}`,
+      });
+    }
 
     if (statusChanged) {
       log(data, actor, {

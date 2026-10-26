@@ -507,3 +507,13 @@ export async function moveTaskAction(
 ): Promise<ActionResult> {
   return run(() => updateTask(taskId, { status, ...(ownerId ? { ownerId } : {}) }));
 }
+
+/** Corrects a project's price and currency, e.g. one entered in the wrong currency. */
+export async function setProjectPriceAction(
+  projectId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  const price = money(form, "price", "currency");
+  if (!price) return { ok: false, error: "Укажите стоимость." };
+  return run(() => updateClientProject(projectId, { price }));
+}

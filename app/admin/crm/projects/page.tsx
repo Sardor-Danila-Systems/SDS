@@ -11,7 +11,7 @@ import {
 import { ActionForm } from "@/components/crm/action-form";
 import { Field, FieldRow, SelectField, TextField } from "@/components/crm/fields";
 import { ProjectStatusPicker } from "@/components/crm/project-status";
-import { addClientProjectAction, addPaymentAction } from "../actions";
+import { addClientProjectAction, addPaymentAction, setProjectPriceAction } from "../actions";
 
 /**
  * Client projects — the commercial work, deliberately separate from the
@@ -31,6 +31,7 @@ export default async function ClientProjectsPage() {
   }
 
   const showMoney = canSeeFinance(user.role);
+  const canEditPrice = user.role === "ADMIN";
   const clientName = (id: string) => {
     const client = clients.find((c) => c.id === id);
     return client ? (client.company ?? client.name) : "—";
@@ -134,6 +135,30 @@ export default async function ClientProjectsPage() {
                           <input type="hidden" name="currency" value={f.currency} />
                           <Field label="Комментарий" name="note" placeholder="Предоплата" />
                         </ActionForm>
+
+                        {canEditPrice ? (
+                          <details className="mt-5">
+                            <summary className="cursor-pointer list-none text-xs text-muted-foreground transition-colors hover:text-foreground">
+                              Изменить стоимость и валюту
+                            </summary>
+                            <div className="mt-3">
+                              <ActionForm
+                                action={setProjectPriceAction.bind(null, project.id)}
+                                submitLabel="Сохранить"
+                                pendingLabel="Сохраняем…"
+                                resetOnSuccess={false}
+                              >
+                                <FieldRow>
+                                  <Field label="Стоимость" name="price" defaultValue={f.total ? String(f.total) : ""} />
+                                  <SelectField
+                                    label="Валюта" name="currency" defaultValue={f.currency}
+                                    options={CURRENCY_OPTIONS}
+                                  />
+                                </FieldRow>
+                              </ActionForm>
+                            </div>
+                          </details>
+                        ) : null}
                       </div>
                     </div>
                   ) : null}

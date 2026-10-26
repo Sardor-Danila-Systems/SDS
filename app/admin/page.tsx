@@ -23,7 +23,8 @@ import {
   Stat,
   StageBadge,
   formatDate,
-  formatMoney,
+  formatTotals,
+  sumByCurrency,
 } from "@/components/crm/ui";
 
 /**
@@ -69,12 +70,9 @@ export default async function AdminDashboardPage() {
     (l) => (l.nextActionAt ?? "").slice(0, 10) < today,
   );
 
-  const sum = (rows: typeof leads, pick: (l: (typeof leads)[number]) => number) =>
-    rows.reduce((total, row) => total + pick(row), 0);
-  const pipelineValue = sum(active, (l) => l.proposedPrice?.amount ?? l.budget?.amount ?? 0);
-  const wonValue = sum(won, (l) => l.proposedPrice?.amount ?? l.budget?.amount ?? 0);
-  const currency =
-    active[0]?.proposedPrice?.currency ?? active[0]?.budget?.currency ?? "UZS";
+  const price = (l: (typeof leads)[number]) => l.proposedPrice ?? l.budget;
+  const pipelineValue = sumByCurrency(active.map(price));
+  const wonValue = sumByCurrency(won.map(price));
 
   const isEmpty = leads.length === 0 && prospects.length === 0;
   const leadTitle = (l: (typeof leads)[number]) =>
@@ -122,8 +120,8 @@ export default async function AdminDashboardPage() {
 
       {showMoney ? (
         <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          <Stat icon={TrendingUp} value={formatMoney({ amount: pipelineValue, currency })} label="В воронке" />
-          <Stat icon={Trophy} value={formatMoney({ amount: wonValue, currency })} label="Выиграно" tone="accent" />
+          <Stat icon={TrendingUp} value={formatTotals(pipelineValue)} label="В воронке" />
+          <Stat icon={Trophy} value={formatTotals(wonValue)} label="Выиграно" tone="accent" />
           <Stat icon={Handshake} value={String(won.length)} label="Успешных сделок" />
           <Stat icon={XCircle} value={String(lost.length)} label="Потерянных сделок" />
         </section>
