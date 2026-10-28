@@ -120,7 +120,11 @@
   },
   "Footer": {
     "tagline": "Digital product development for business.",
-    "rights": "All rights reserved."
+    "rights": "All rights reserved.",
+    "sections": "Sections",
+    "social": "Social",
+    "contacts": "Contact",
+    "backToTop": "Back to top ↑"
   },
   "CaseStudy": {
     "breadcrumb": "Projects",
