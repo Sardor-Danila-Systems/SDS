@@ -3,6 +3,11 @@
 /* `dark:` follows the .dark class (the admin theme switch), not the OS setting. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* The opening is skipped before first paint when this class is on <html>. */
+.sds-no-preloader .sds-preloader {
+  display: none;
+}
+
 /*
   SDS design system — "editorial".
 
