@@ -16,6 +16,7 @@ import {
   Send,
   Users,
   UsersRound,
+  Video,
   Wallet,
   X,
   type LucideIcon,
@@ -77,7 +78,10 @@ const GROUPS: NavGroup[] = [
   },
   {
     label: "Управление",
-    items: [{ href: "/admin/team", label: "Команда", icon: UsersRound, roles: ["ADMIN"] }],
+    items: [
+      { href: "/admin/team", label: "Команда", icon: UsersRound, roles: ["ADMIN"] },
+      { href: "/admin/standups", label: "Созвоны", icon: Video, roles: ["ADMIN"] },
+    ],
   },
   {
     label: "Сайт",

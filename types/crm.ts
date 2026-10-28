@@ -304,6 +304,87 @@ export interface Expense {
   deletedAt?: string;
 }
 
+export const ATTENDANCE_STATUSES = [
+  "UNMARKED",
+  "PRESENT",
+  "LATE",
+  "ABSENT",
+  "WARNED",
+  "EXCUSED",
+] as const;
+export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
+
+export const ABSENCE_REASONS = [
+  "ILLNESS",
+  "STUDY_WORK",
+  "TECHNICAL",
+  "WARNED_EARLIER",
+  "PERSONAL",
+  "OTHER",
+] as const;
+export type AbsenceReason = (typeof ABSENCE_REASONS)[number];
+
+export type StandupStatus = "PLANNED" | "HELD" | "CANCELLED";
+
+/** One person's mark on one call. A guest has no `userId`. */
+export interface Attendance {
+  id: string;
+  userId?: string;
+  name: string;
+  guest?: boolean;
+  status: AttendanceStatus;
+  reason?: AbsenceReason;
+  reasonText?: string;
+}
+
+export interface StandupChange {
+  id: string;
+  at: string;
+  actorName: string;
+  summary: string;
+}
+
+/**
+ * A call (a "daily"). Date and time are wall-clock strings — the team sits in
+ * one time zone, and a stored instant would shift the hour depending on where
+ * the server happens to run.
+ */
+export interface Standup {
+  id: string;
+  title: string;
+  /** YYYY-MM-DD */
+  date: string;
+  /** HH:MM */
+  time: string;
+  link?: string;
+  status: StandupStatus;
+  cancelReason?: string;
+  agenda: string;
+  notes: string;
+  summary: string;
+  /** Pinned summaries stay on top of the section after the call. */
+  pinned: boolean;
+  organizerId: string;
+  organizerName: string;
+  attendance: Attendance[];
+  history: StandupChange[];
+  /** Created by the schedule rather than by hand. */
+  auto?: boolean;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface StandupSchedule {
+  enabled: boolean;
+  /** ISO weekdays: 1 = Monday … 7 = Sunday. */
+  days: number[];
+  time: string;
+  title: string;
+  link?: string;
+  agenda: string;
+}
+
 export interface TaskComment {
   id: string;
   authorId: string;
@@ -323,6 +404,8 @@ export interface Task {
   number?: number;
   /** The client project this task belongs to, if any. */
   projectId?: string;
+  /** The call this task came out of. */
+  standupId?: string;
   comments?: TaskComment[];
   /** The assignee. Sales and developers only ever see tasks they own. */
   ownerId?: string;
@@ -398,6 +481,8 @@ export interface CrmData {
   meetings: Meeting[];
   proposals: Proposal[];
   expenses: Expense[];
+  standups: Standup[];
+  standupSchedule?: StandupSchedule;
   activities: Activity[];
 }
 
@@ -412,5 +497,6 @@ export const emptyCrmData: CrmData = {
   meetings: [],
   proposals: [],
   expenses: [],
+  standups: [],
   activities: [],
 };
