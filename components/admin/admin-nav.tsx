@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import {
+  BarChart3,
   Briefcase,
   CalendarDays,
   Columns3,
@@ -50,7 +51,10 @@ interface NavGroup {
 const GROUPS: NavGroup[] = [
   {
     label: null,
-    items: [{ href: "/admin", label: "Сегодня", icon: LayoutDashboard }],
+    items: [
+      { href: "/admin", label: "Сегодня", icon: LayoutDashboard },
+      { href: "/admin/analytics", label: "Аналитика", icon: BarChart3, roles: ["ADMIN"] },
+    ],
   },
   {
     label: "Задачи",
