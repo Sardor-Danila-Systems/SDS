@@ -610,6 +610,7 @@ export async function createTask(input: Partial<Task> & { title: string }) {
       id: id(),
       number,
       projectId: input.projectId,
+      standupId: input.standupId,
       title: input.title.trim(),
       description: input.description,
       status: input.status ?? "TODO",
