@@ -120,7 +120,11 @@
   },
   "Footer": {
     "tagline": "Biznes uchun raqamli mahsulotlar ishlab chiqish.",
-    "rights": "Barcha huquqlar himoyalangan."
+    "rights": "Barcha huquqlar himoyalangan.",
+    "sections": "Boʻlimlar",
+    "social": "Ijtimoiy tarmoqlar",
+    "contacts": "Aloqa",
+    "backToTop": "Tepaga ↑"
   },
   "CaseStudy": {
     "breadcrumb": "Loyihalar",
