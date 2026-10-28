@@ -9,6 +9,8 @@ import { buildMetadata } from "@/lib/seo";
 import { Header } from "@/components/navigation/header";
 import { Footer } from "@/components/layout/footer";
 import { SmoothScroll } from "@/components/animations/smooth-scroll";
+import { Preloader } from "@/components/layout/preloader";
+import { PRELOADER_GUARD } from "@/components/layout/preloader-shared";
 import { OrganizationSchema } from "@/components/structured-data";
 import "../globals.css";
 
@@ -76,8 +78,21 @@ export default async function LocaleLayout({
   const t = await getTranslations({ locale, namespace: "Nav" });
 
   return (
-    <html lang={locale} className={`${onest.variable} ${mono.variable}`}>
+    <html
+      lang={locale}
+      className={`${onest.variable} ${mono.variable}`}
+      // The guard below may add a class to <html> before React sees it.
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: PRELOADER_GUARD }} />
+        {/* Without JavaScript the opening could never end — never show it. */}
+        <noscript>
+          <style>{".sds-preloader{display:none}"}</style>
+        </noscript>
+      </head>
       <body className="min-h-dvh bg-background font-sans antialiased">
+        <Preloader />
         <OrganizationSchema />
         <NextIntlClientProvider>
           <a

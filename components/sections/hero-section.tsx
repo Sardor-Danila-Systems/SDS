@@ -10,8 +10,11 @@ import { scrollToSection } from "@/lib/scroll";
 import { HeroVisual } from "@/components/hero/hero-visual";
 import { AsciiHalftone } from "@/components/hero/ascii-halftone";
 import { cn } from "@/lib/utils";
+import { PRELOADER_EVENT } from "@/components/layout/preloader-shared";
 
+// Shorter when the site's opening has just played — two long intros in a row is too much.
 const INTRO_MS = 4600;
+const INTRO_AFTER_PRELOADER_MS = 3000;
 const SEEN_KEY = "sds-hero-intro";
 
 /**
@@ -29,6 +32,9 @@ export function HeroSection() {
   const lines = t.raw("titleLines") as string[];
 
   const [revealed, setRevealed] = useState(false);
+  // The scene starts only once the opening (if there is one) has lifted.
+  const [stageReady, setStageReady] = useState(false);
+  const [afterPreloader, setAfterPreloader] = useState(false);
 
   const reveal = useCallback(() => {
     setRevealed(true);
@@ -39,10 +45,31 @@ export function HeroSection() {
     }
   }, []);
 
+  useEffect(() => {
+    if (window.__sdsPreloaderDone) {
+      setStageReady(true);
+      return;
+    }
+    const onDone = (event: Event) => {
+      setAfterPreloader(Boolean((event as CustomEvent).detail?.played));
+      setStageReady(true);
+    };
+    window.addEventListener(PRELOADER_EVENT, onDone);
+    // Never leave the hero waiting on an opening that failed to report in.
+    const fallback = window.setTimeout(() => setStageReady(true), 8000);
+    return () => {
+      window.removeEventListener(PRELOADER_EVENT, onDone);
+      window.clearTimeout(fallback);
+    };
+  }, []);
+
   // Seen already this session: go straight to the finished hero.
   useEffect(() => {
     try {
-      if (sessionStorage.getItem(SEEN_KEY)) setRevealed(true);
+      // `?intro` replays the opening, so the hero scene must play too.
+      if (sessionStorage.getItem(SEEN_KEY) && !window.location.search.includes("intro")) {
+        setRevealed(true);
+      }
     } catch {
       /* ignore */
     }
@@ -70,15 +97,17 @@ export function HeroSection() {
       </noscript>
 
       <div className="relative isolate flex min-h-[100svh] flex-col justify-end pb-14 pt-28 sm:pt-32 lg:pb-20 lg:pt-36">
-        <AsciiHalftone
-          introMs={INTRO_MS}
-          onIntroEnd={reveal}
-          className={cn(
-            "absolute inset-0 -z-10 size-full transition-opacity duration-[1400ms] ease-out",
-            "[mask-image:linear-gradient(to_bottom,black_72%,transparent)]",
-            revealed ? "opacity-[0.26]" : "opacity-100",
-          )}
-        />
+        {stageReady ? (
+          <AsciiHalftone
+            introMs={afterPreloader ? INTRO_AFTER_PRELOADER_MS : INTRO_MS}
+            onIntroEnd={reveal}
+            className={cn(
+              "absolute inset-0 -z-10 size-full transition-opacity duration-[1400ms] ease-out",
+              "[mask-image:linear-gradient(to_bottom,black_72%,transparent)]",
+              revealed ? "opacity-[0.26]" : "opacity-100",
+            )}
+          />
+        ) : null}
 
         {!revealed ? (
           <button
