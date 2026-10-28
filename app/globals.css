@@ -124,9 +124,27 @@
 
   html {
     -webkit-text-size-adjust: 100%;
-    /* Anchor jumps stay smooth; Lenis takes over wheel scrolling on pointer
-       devices and is disabled under prefers-reduced-motion. */
+    /* Anchor jumps stay smooth where Lenis is not running (touch, reduced
+       motion handled below). */
     scroll-behavior: smooth;
+  }
+
+  /*
+    Where Lenis runs it must be the only thing smoothing the scroll. Lenis
+    moves the page a little every frame; with native smooth scrolling on as
+    well the browser tries to ease each of those tiny moves too, the two fight,
+    and scrolling turns heavy and slow. Lenis's own stylesheet asks for exactly
+    this.
+  */
+  html.lenis,
+  html.lenis body {
+    height: auto;
+  }
+  html.lenis {
+    scroll-behavior: auto !important;
+  }
+  html.lenis.lenis-stopped {
+    overflow: clip;
   }
 
   body {

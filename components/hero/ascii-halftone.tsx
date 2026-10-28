@@ -268,12 +268,25 @@ export function AsciiHalftone({
       ctx!.fill(accentPath);
     }
 
+    // While the page is being scrolled the scene holds still: the header
+    // blurs whatever is behind it, and repainting an animated canvas under a
+    // blur on every frame is exactly what makes scrolling heavy.
+    let scrolled = window.scrollY > 4;
+
     function loop(now: number) {
       raf = 0;
-      if (!visible || document.hidden) return;
+      if (!visible || document.hidden || scrolled) return;
       frame(now);
       raf = requestAnimationFrame(loop);
     }
+
+    const onScroll = () => {
+      const next = window.scrollY > 4;
+      if (next === scrolled) return;
+      scrolled = next;
+      if (!scrolled) start();
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
 
     function start() {
       if (raf || reduced) return;
@@ -330,6 +343,7 @@ export function AsciiHalftone({
       cancelAnimationFrame(raf);
       resizeObserver.disconnect();
       visibility.disconnect();
+      window.removeEventListener("scroll", onScroll);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerleave", onLeave);
