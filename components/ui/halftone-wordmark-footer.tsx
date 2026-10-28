@@ -320,6 +320,10 @@ export default function HalftoneWordmarkFooter({
       const ringAge = ring.t < 0 ? 1e9 : now - ring.t
       const ringR = ringAge * 0.9
       let moving = false
+      // Dots at rest are the vast majority and share one colour, so they go
+      // into a single path and one fill — a fill per dot is what makes the
+      // footer heavy. Only displaced (warming) dots are painted one by one.
+      const rest = new Path2D()
       for (let i = 0; i < count; i++) {
         const j = i * 7
         let x = dots[j]
@@ -358,17 +362,22 @@ export default function HalftoneWordmarkFooter({
           dots[j + 3] = vy
         }
         const k = hwfWarmth(x, y, hx, hy, 28)
-        ctx.fillStyle =
-          k > 0.02
-            ? "rgb(" +
-              Math.round(ink[0] + (warm[0] - ink[0]) * k) + "," +
-              Math.round(ink[1] + (warm[1] - ink[1]) * k) + "," +
-              Math.round(ink[2] + (warm[2] - ink[2]) * k) + ")"
-            : o.colors.ink
-        ctx.beginPath()
-        ctx.arc(x, y, dots[j + 6], 0, 6.2832)
-        ctx.fill()
+        if (k > 0.02) {
+          ctx.fillStyle =
+            "rgb(" +
+            Math.round(ink[0] + (warm[0] - ink[0]) * k) + "," +
+            Math.round(ink[1] + (warm[1] - ink[1]) * k) + "," +
+            Math.round(ink[2] + (warm[2] - ink[2]) * k) + ")"
+          ctx.beginPath()
+          ctx.arc(x, y, dots[j + 6], 0, 6.2832)
+          ctx.fill()
+        } else {
+          rest.moveTo(x + dots[j + 6], y)
+          rest.arc(x, y, dots[j + 6], 0, 6.2832)
+        }
       }
+      ctx.fillStyle = o.colors.ink
+      ctx.fill(rest)
 
       if (grainTile && o.grain > 0) {
         ctx.globalAlpha = Math.min(1, o.grain) * 0.09
@@ -381,8 +390,9 @@ export default function HalftoneWordmarkFooter({
         ctx.globalAlpha = 1
         ctx.globalCompositeOperation = "source-over"
       }
-      // Sleep once everything is home and nothing is pushing.
-      awake = moving || ringAge < 900 || px > -1e4
+      // Sleep once everything is home. A pointer resting on the footer does not
+      // keep it drawing: the next move wakes it.
+      awake = moving || ringAge < 900
     }
 
     const loop = (now: number) => {
