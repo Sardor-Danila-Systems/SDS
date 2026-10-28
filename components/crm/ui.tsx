@@ -232,28 +232,35 @@ export const TASK_STATUS_LABEL: Record<TaskStatus, string> = {
   CANCELLED: "Отменена",
 };
 
-/** A KPI tile: the figure, what it counts, and an icon to find it by. */
+/**
+ * A KPI tile in the analytics style: a quiet caption, the figure in tabular
+ * monospace, and an optional change against the previous period (a leading
+ * "-" reads as a drop).
+ */
 export function Stat({
   value,
   label,
   tone = "default",
   href,
   icon: Icon,
+  delta,
 }: {
   value: string;
   label: string;
   tone?: "default" | "accent" | "warn";
   href?: string;
   icon?: LucideIcon;
+  delta?: string;
 }) {
+  const down = delta ? /^[-−]/.test(delta) : false;
   const body = (
     <>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-[0.8125rem] tracking-[-0.01em] text-muted-foreground">{label}</p>
         {Icon ? (
           <span
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-lg",
+              "flex size-8 shrink-0 items-center justify-center rounded-xl",
               tone === "accent" && "bg-primary-soft text-primary",
               tone === "warn" && "bg-destructive/10 text-destructive",
               tone === "default" && "bg-surface text-muted-foreground",
@@ -265,13 +272,26 @@ export function Stat({
       </div>
       <p
         className={cn(
-          "mt-3 text-[1.75rem] font-semibold leading-none tracking-[-0.035em] tabular",
+          "mt-3 font-mono text-[1.75rem] font-medium leading-none tracking-[-0.04em] tabular",
           tone === "accent" && "text-primary",
           tone === "warn" && "text-destructive",
         )}
       >
         {value}
       </p>
+      {delta ? (
+        <p
+          className={cn(
+            "mt-2 inline-flex items-center gap-1 text-xs font-semibold tracking-[-0.02em]",
+            down ? "text-destructive" : "text-[var(--success)]",
+          )}
+        >
+          <svg viewBox="0 0 12 12" className={cn("size-[11px]", down && "rotate-180")} aria-hidden="true">
+            <path d="M6 10.5V1.5M2 5.5l4-4 4 4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {delta.replace(/^[-−+]/, "")}
+        </p>
+      ) : null}
     </>
   );
 

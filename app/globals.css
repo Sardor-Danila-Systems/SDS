@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* `dark:` follows the .dark class (the admin theme switch), not the OS setting. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /*
   SDS design system — "editorial".
 
