@@ -177,12 +177,15 @@
       "messagePlaceholder": "What needs to be done? A few words about the business, the problem and the timeline.",
       "submit": "Send",
       "emailSubject": "Enquiry from the website",
-      "success": "Thank you. The message is ready — send it from your mail client, or write to us on Telegram.",
+      "success": "Thank you! Your enquiry has been sent — we will get back to you shortly.",
       "errors": {
         "name": "Please enter your name.",
         "contact": "Leave a contact so we can reply.",
-        "message": "Add a couple of details about the project."
-      }
+        "message": "Add a couple of details about the project.",
+        "tooMany": "Too many attempts. Please try again later or message us on Telegram."
+      },
+      "fallbackSuccess": "We could not send your enquiry directly. An email has been prepared — send it from your mail app or message us on Telegram.",
+      "sending": "Sending…"
     },
     "channels": {
       "title": "Write to us directly",
