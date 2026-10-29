@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createWebsiteLead } from "@/lib/crm/inbound";
 import { CrmStoreError } from "@/lib/crm/store";
 import { siteConfig } from "@/lib/site";
+import { BUDGETS, CHANNELS, SERVICES, type Budget, type Channel, type Service } from "@/lib/contact-options";
 
 /**
  * The contact form's endpoint: an enquiry from the site becomes a new lead in
@@ -75,6 +76,13 @@ export async function POST(request: Request) {
   const message = text(body.message, 4000);
   const locale = ["ru", "en", "uz"].includes(String(body.locale)) ? String(body.locale) : "ru";
 
+  // Only the offered choices are accepted; anything else is dropped.
+  const services = Array.isArray(body.services)
+    ? [...new Set(body.services.filter((s): s is Service => SERVICES.includes(s as Service)))]
+    : [];
+  const budget = BUDGETS.includes(body.budget as Budget) ? (body.budget as Budget) : undefined;
+  const channel = CHANNELS.includes(body.channel as Channel) ? (body.channel as Channel) : undefined;
+
   if (!name || contact.length < 3 || message.length < 10) {
     return NextResponse.json({ error: "invalid" }, { status: 400 });
   }
@@ -85,7 +93,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await createWebsiteLead({ name, company, contact, message, locale });
+    await createWebsiteLead({ name, company, contact, message, locale, services, budget, channel });
     return NextResponse.json({ ok: true });
   } catch (error) {
     // The CRM store being unreachable is the one failure the form can recover

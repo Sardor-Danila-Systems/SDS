@@ -170,7 +170,7 @@
       "name": "Ism",
       "namePlaceholder": "Sizga qanday murojaat qilaylik",
       "company": "Kompaniya",
-      "companyPlaceholder": "Majburiy emas",
+      "companyPlaceholder": "Kompaniya nomi",
       "contact": "Kontakt",
       "contactPlaceholder": "Email yoki Telegram",
       "message": "Loyiha haqida gapirib bering",
@@ -182,10 +182,50 @@
         "name": "Ismingizni kiriting.",
         "contact": "Javob berishimiz uchun kontakt qoldiring.",
         "message": "Loyiha haqida bir-ikki tafsilot qoʻshing.",
-        "tooMany": "Urinishlar juda koʻp. Keyinroq urinib koʻring yoki Telegramda yozing."
+        "tooMany": "Urinishlar juda koʻp. Keyinroq urinib koʻring yoki Telegramda yozing.",
+        "contactFormat": {
+          "telegram": "Telegram nikini tekshiring: 4–32 belgi, lotin harflari, raqamlar va _.",
+          "email": "Emailni tekshiring — masalan, name@company.com.",
+          "phone": "Raqamni tekshiring: kamida 7 ta raqam kerak."
+        }
       },
       "fallbackSuccess": "Arizani toʻgʻridan-toʻgʻri yuborib boʻlmadi. Xat tayyorlandi — uni pochta ilovasidan yuboring yoki Telegramda yozing.",
-      "sending": "Yuborilmoqda…"
+      "sending": "Yuborilmoqda…",
+      "services": {
+        "title": "Nima qilish kerak",
+        "website": "Sayt",
+        "shop": "Internet-doʻkon",
+        "crm": "CRM / ERP",
+        "mobile": "Mobil ilova",
+        "automation": "Avtomatlashtirish",
+        "other": "Boshqa"
+      },
+      "budget": {
+        "title": "Byudjet",
+        "lt2": "$2 000 gacha",
+        "b2_5": "$2 000 – 5 000",
+        "b5_15": "$5 000 – 15 000",
+        "gt15": "$15 000 dan",
+        "unknown": "Hali bilmayman"
+      },
+      "channel": {
+        "title": "Siz bilan qanday bogʻlanamiz",
+        "telegram": "Telegram",
+        "email": "Email",
+        "phone": "Telefon",
+        "placeholder": {
+          "telegram": "username",
+          "email": "name@company.com",
+          "phone": "+998 90 123 45 67"
+        }
+      },
+      "optional": "ixtiyoriy",
+      "multiple": "bir nechtasini tanlash mumkin",
+      "messageHint": "Biznes, vazifa va muddatlar haqida bir-ikki soʻz kifoya.",
+      "note": "Tanlangan kanal orqali javob beramiz. Kontaktlaringizdan faqat arizaga javob berish uchun foydalanamiz.",
+      "successTitle": "Ariza yuborildi",
+      "fallbackTitle": "Deyarli tayyor",
+      "sendAnother": "Yana bittasini yuborish"
     },
     "channels": {
       "title": "Toʻgʻridan-toʻgʻri yozish",

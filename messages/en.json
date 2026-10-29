@@ -170,7 +170,7 @@
       "name": "Name",
       "namePlaceholder": "What should we call you",
       "company": "Company",
-      "companyPlaceholder": "Optional",
+      "companyPlaceholder": "Company name",
       "contact": "Contact",
       "contactPlaceholder": "Email or Telegram",
       "message": "Tell us about the project",
@@ -182,10 +182,50 @@
         "name": "Please enter your name.",
         "contact": "Leave a contact so we can reply.",
         "message": "Add a couple of details about the project.",
-        "tooMany": "Too many attempts. Please try again later or message us on Telegram."
+        "tooMany": "Too many attempts. Please try again later or message us on Telegram.",
+        "contactFormat": {
+          "telegram": "Check your Telegram username: 4–32 characters, Latin letters, digits and _.",
+          "email": "Check the email — for example, name@company.com.",
+          "phone": "Check the number: it needs at least 7 digits."
+        }
       },
       "fallbackSuccess": "We could not send your enquiry directly. An email has been prepared — send it from your mail app or message us on Telegram.",
-      "sending": "Sending…"
+      "sending": "Sending…",
+      "services": {
+        "title": "What do you need",
+        "website": "Website",
+        "shop": "Online store",
+        "crm": "CRM / ERP",
+        "mobile": "Mobile app",
+        "automation": "Automation",
+        "other": "Something else"
+      },
+      "budget": {
+        "title": "Budget",
+        "lt2": "under $2,000",
+        "b2_5": "$2,000 – 5,000",
+        "b5_15": "$5,000 – 15,000",
+        "gt15": "$15,000+",
+        "unknown": "Not sure yet"
+      },
+      "channel": {
+        "title": "How to reach you",
+        "telegram": "Telegram",
+        "email": "Email",
+        "phone": "Phone",
+        "placeholder": {
+          "telegram": "username",
+          "email": "name@company.com",
+          "phone": "+998 90 123 45 67"
+        }
+      },
+      "optional": "optional",
+      "multiple": "pick any",
+      "messageHint": "A few words about the business, the task and the timeline are enough.",
+      "note": "We will reply through the channel you chose and use your contact only to answer this enquiry.",
+      "successTitle": "Enquiry sent",
+      "fallbackTitle": "Almost there",
+      "sendAnother": "Send another one"
     },
     "channels": {
       "title": "Write to us directly",
