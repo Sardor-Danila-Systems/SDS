@@ -23,6 +23,7 @@ import {
   Stat,
   StageBadge,
   formatDate,
+  formatDateTime,
   formatTotals,
   sumByCurrency,
 } from "@/components/crm/ui";
@@ -75,6 +76,10 @@ export default async function AdminDashboardPage() {
   const wonValue = sumByCurrency(won.map(price));
 
   const isEmpty = leads.length === 0 && prospects.length === 0;
+  // Enquiries from the site that nobody has picked up yet.
+  const fresh = leads
+    .filter((l) => l.source === "WEBSITE" && l.stage === "NEW")
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const leadTitle = (l: (typeof leads)[number]) =>
     l.company ?? `${l.firstName} ${l.lastName ?? ""}`.trim();
 
@@ -125,6 +130,43 @@ export default async function AdminDashboardPage() {
           <Stat icon={Handshake} value={String(won.length)} label="Успешных сделок" />
           <Stat icon={XCircle} value={String(lost.length)} label="Потерянных сделок" />
         </section>
+      ) : null}
+
+      {fresh.length > 0 ? (
+        <Panel
+          title={`Новые заявки с сайта · ${fresh.length}`}
+          description="Пришли через форму на сайте и ждут ответа"
+          flush
+          action={
+            <Link href="/admin/crm/leads" className="text-muted-foreground transition-colors hover:text-foreground">
+              Все лиды
+            </Link>
+          }
+        >
+          <ul className="divide-y divide-border">
+            {fresh.slice(0, 5).map((lead) => (
+              <li key={lead.id}>
+                <Link
+                  href={`/admin/crm/leads/${lead.id}`}
+                  className="group block px-5 py-3.5 transition-colors hover:bg-surface/60"
+                >
+                  <div className="flex items-baseline justify-between gap-4">
+                    <span className="truncate text-sm font-medium group-hover:text-primary">
+                      {leadTitle(lead)}
+                      <span className="ml-2 text-xs font-normal text-muted-foreground">
+                        {lead.email ?? lead.telegram ?? lead.phone ?? ""}
+                      </span>
+                    </span>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatDateTime(lead.createdAt)}
+                    </span>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{lead.description}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
       ) : null}
 
       <section className="grid gap-4 lg:grid-cols-2">

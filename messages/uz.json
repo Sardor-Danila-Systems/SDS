@@ -177,12 +177,15 @@
       "messagePlaceholder": "Nima qilish kerak? Biznes, vazifa va muddatlar haqida bir necha soʻz.",
       "submit": "Yuborish",
       "emailSubject": "Saytdan ariza",
-      "success": "Rahmat. Xat tayyorlandi — uni pochta ilovangizdan yuboring yoki bizga Telegramda yozing.",
+      "success": "Rahmat! Arizangiz yuborildi — tez orada siz bilan bogʻlanamiz.",
       "errors": {
         "name": "Ismingizni kiriting.",
         "contact": "Javob berishimiz uchun kontakt qoldiring.",
-        "message": "Loyiha haqida bir-ikki tafsilot qoʻshing."
-      }
+        "message": "Loyiha haqida bir-ikki tafsilot qoʻshing.",
+        "tooMany": "Urinishlar juda koʻp. Keyinroq urinib koʻring yoki Telegramda yozing."
+      },
+      "fallbackSuccess": "Arizani toʻgʻridan-toʻgʻri yuborib boʻlmadi. Xat tayyorlandi — uni pochta ilovasidan yuboring yoki Telegramda yozing.",
+      "sending": "Yuborilmoqda…"
     },
     "channels": {
       "title": "Toʻgʻridan-toʻgʻri yozish",
