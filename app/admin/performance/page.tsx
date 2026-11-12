@@ -115,7 +115,12 @@ export default async function PerformancePage({
                 {data.people.map((p) => (
                   <tr key={p.name} className="border-b border-border last:border-0">
                     <td className="px-5 py-3">
-                      <span className="font-medium">{p.name}</span>
+                      <Link
+                        href={`/admin/performance/${encodeURIComponent(p.name)}?days=${period}`}
+                        className="font-medium hover:text-primary hover:underline"
+                      >
+                        {p.name}
+                      </Link>
                       {p.github && p.github !== p.name ? (
                         <span className="ml-2 text-xs text-muted-foreground">@{p.github}</span>
                       ) : null}
