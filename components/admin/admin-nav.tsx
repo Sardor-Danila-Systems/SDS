@@ -10,6 +10,7 @@ import {
   Columns3,
   FolderKanban,
   Gauge,
+  Activity,
   KanbanSquare,
   Globe,
   LayoutDashboard,
@@ -85,6 +86,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/team", label: "Команда", icon: UsersRound, roles: ["ADMIN"] },
       { href: "/admin/standups", label: "Созвоны", icon: Video, roles: ["ADMIN"] },
+      { href: "/admin/performance", label: "Dev performance", icon: Activity, roles: ["ADMIN"] },
     ],
   },
   {
