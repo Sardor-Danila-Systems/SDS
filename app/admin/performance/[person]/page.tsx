@@ -63,7 +63,13 @@ export default async function PersonPerformancePage({
   if (!can(user.role, "team.view")) redirect("/admin");
 
   const { person } = await params;
-  const name = decodeURIComponent(person);
+  // Next may hand the segment over still encoded (non-ASCII names); decoding twice is harmless.
+  let name = person;
+  try {
+    name = decodeURIComponent(person);
+  } catch {
+    // A stray "%" in a name: keep the raw segment.
+  }
   const { days } = await searchParams;
   const period = (PERIODS.find((p) => String(p) === days) ?? 30) as Period;
 
