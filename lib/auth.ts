@@ -2,7 +2,7 @@ import "server-only";
 import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies, headers } from "next/headers";
-import type { Role, User } from "@/types/crm";
+import { ROLES, type Role, type User } from "@/types/crm";
 import { can } from "./crm/rbac";
 import { readCrm, mutateCrm } from "./crm/store";
 
@@ -21,7 +21,7 @@ const secret = new TextEncoder().encode(
   - CRM users stored in the document, with PBKDF2-hashed passwords.
 
   And one for a machine: Jarvis, the AI assistant, calls /api/jarvis with
-  `Authorization: Bearer <JARVIS_API_TOKEN>` — see `jarvisSession`.
+  `Authorization: Bearer <key>` — see `jarvisSession`.
 */
 
 export interface SessionUser {
@@ -98,28 +98,56 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
 /**
  * Jarvis works as a member of the team, not as a password.
  *
- * The key (`JARVIS_API_TOKEN`, 32+ characters) only says "this is Jarvis";
- * what Jarvis may do is the role of the CRM account whose login is
- * `JARVIS_LOGIN` (default `jarvis`), created on the «Команда» page. So:
- * - rights are chosen there, like for any employee, and checked by the same
- *   `requirePermission` in every operation;
- * - deactivating that account revokes the key at once;
- * - every change lands in the activity log under that account's name.
+ * Jarvis keeps the key; the server keeps only its SHA-256
+ * (`JARVIS_API_KEY_SHA256`), so reading the project's env vars does not let
+ * anyone in. What Jarvis may do is the role of the CRM account whose login is
+ * `JARVIS_LOGIN` (default `jarvis`):
+ * - on first use that account is created with the role `JARVIS_ROLE`
+ *   (default SALES) and no password, so it cannot sign in to the panel;
+ *   afterwards its role is changed on «Команда» like anyone else's;
+ * - every operation is checked by the same `requirePermission` as in the UI;
+ * - deactivating the account revokes the key at once;
+ * - every change lands in the activity log under its name.
  *
  * Only reachable on /api/jarvis: everything else under /admin and /api/admin
  * is behind the cookie check in middleware.
  */
 async function jarvisSession(authorization: string): Promise<SessionUser | null> {
-  const expected = process.env.JARVIS_API_TOKEN;
-  if (!expected || expected.length < 32) return null;
-  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
-  if (!match || !safeEqual(match[1].trim(), expected)) return null;
+  const expected = process.env.JARVIS_API_KEY_SHA256?.trim().toLowerCase();
+  if (!expected || !/^[0-9a-f]{64}$/.test(expected)) return null;
+  const match = /^Bearer\s+(\S{32,})$/i.exec(authorization.trim());
+  if (!match) return null;
+  const digest = toHex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(match[1])));
+  if (!safeEqual(digest, expected)) return null;
 
   const login = (process.env.JARVIS_LOGIN ?? "jarvis").trim().toLowerCase();
   const { users } = await readCrm();
-  const account = users.find((u) => u.login.toLowerCase() === login && u.active);
-  if (!account) return null;
+  const account = users.find((u) => u.login.toLowerCase() === login) ?? (await createJarvisAccount(login));
+  if (!account.active) return null;
   return { id: account.id, name: account.name, login: account.login, role: account.role };
+}
+
+async function createJarvisAccount(login: string): Promise<User> {
+  const wanted = process.env.JARVIS_ROLE?.trim().toUpperCase();
+  const role: Role = (ROLES as readonly string[]).includes(wanted ?? "") ? (wanted as Role) : "SALES";
+  return mutateCrm((data) => {
+    const existing = data.users.find((u) => u.login.toLowerCase() === login);
+    if (existing) return existing;
+    const createdAt = new Date().toISOString();
+    const user: User = { id: crypto.randomUUID(), name: "Jarvis", login, role, active: true, createdAt };
+    data.users.push(user);
+    data.activities.push({
+      id: crypto.randomUUID(),
+      kind: "CREATED",
+      entityType: "user",
+      entityId: user.id,
+      summary: `Аккаунт Jarvis (ИИ-ассистент Сардора), роль ${role}, без пароля`,
+      actorId: user.id,
+      actorName: user.name,
+      createdAt,
+    });
+    return user;
+  });
 }
 
 /** Editing the public site's content is the admin's job, not the sales team's. */

@@ -63,11 +63,13 @@ const sortKey = (s: Pick<Standup, "date" | "time">) => `${s.date} ${s.time}`;
 
 /* ------------------------------- participants ----------------------------- */
 
+/** People expected on calls — Jarvis, the AI assistant's account, is not one of them. */
 function participants(data: CrmData) {
+  const jarvis = (process.env.JARVIS_LOGIN ?? "jarvis").trim().toLowerCase();
   return [
     { userId: "bootstrap-admin", name: "Администратор" },
     ...data.users
-      .filter((u) => u.active)
+      .filter((u) => u.active && u.login.toLowerCase() !== jarvis)
       .map((u) => ({ userId: u.id, name: u.name })),
   ];
 }

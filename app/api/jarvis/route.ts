@@ -1,12 +1,15 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { getSessionUser, type SessionUser } from "@/lib/auth";
+import { getSessionUser, listAssignableUsers, type SessionUser } from "@/lib/auth";
 import { can, canSeeFinance, PERMISSIONS, type Permission } from "@/lib/crm/rbac";
 import {
   AuthzError,
   activitiesFor,
+  addExpense,
   addLeadActivity,
+  addPayment,
   addTaskComment,
+  createClientProject,
   convertLeadToClient,
   convertProspectToLead,
   createLead,
@@ -24,13 +27,29 @@ import {
   projectFinance,
   searchCrm,
   teamOverview,
+  updateClientProject,
   updateLead,
   updateProspect,
   updateTask,
 } from "@/lib/crm/repo";
-import { listStandups, wallNow } from "@/lib/crm/standups";
+import {
+  createStandup,
+  createStandupTask,
+  listStandups,
+  markAllPresent,
+  saveSummary,
+  setAttendance,
+  updateStandupText,
+  wallNow,
+} from "@/lib/crm/standups";
+import { PERIODS, buildPerformance, type Period } from "@/lib/performance";
+import { buildPersonDetail } from "@/lib/performance/person";
 import { CrmStoreError } from "@/lib/crm/store";
 import {
+  ABSENCE_REASONS,
+  ATTENDANCE_STATUSES,
+  CLIENT_PROJECT_STATUSES,
+  EXPENSE_CATEGORIES,
   LEAD_STAGES,
   MEETING_TYPES,
   PRIORITIES,
@@ -57,8 +76,9 @@ import {
   lib/crm/repo, so permissions, the activity log and serialised writes are the
   same as in the admin UI.
 
-  Deliberately absent: deleting anything, money (payments, expenses), accounts
-  and passwords, the public site's content. Those stay with people.
+  Deliberately absent: deleting anything, accounts and passwords, the public
+  site's content. Those stay with people. Money (payments, expenses, prices)
+  needs finance.write, and Jarvis's own rules allow it only on Sardor's word.
 */
 
 class InputError extends Error {}
@@ -109,6 +129,25 @@ function when(args: Args, key: string): string | undefined {
     throw new InputError(`${key}: дата ГГГГ-ММ-ДД или время с поясом, например 2026-11-14T15:00:00+05:00`);
   }
   return parsed.toISOString();
+}
+
+function day(args: Args, key: string): string | undefined {
+  const value = str(args, key, 10);
+  if (value === undefined) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new InputError(`${key}: дата ГГГГ-ММ-ДД`);
+  return value;
+}
+
+function period(args: Args): Period {
+  const days = Number(args.days ?? 30);
+  if (!(PERIODS as readonly number[]).includes(days)) throw new InputError(`days: одно из ${PERIODS.join(", ")}`);
+  return days as Period;
+}
+
+function amount(args: Args, key: string): number {
+  const value = Number(args[key]);
+  if (!Number.isFinite(value) || value <= 0) throw new InputError(`${key}: положительное число`);
+  return value;
 }
 
 function money(args: Args, key: string): Money | undefined {
@@ -361,13 +400,31 @@ const OPERATIONS: Record<string, Operation> = {
     },
   },
   "standups.list": {
-    about: "созвоны: дата, тема, кто был, итоги",
+    about: "созвоны: дата, тема, статус, кто был (с id отметок), заметки и итоги",
     needs: "standup.manage",
     run: async (args) =>
       (await listStandups()).slice(0, Math.min(limitOf(args), 20)).map((s) => ({
-        id: s.id, title: s.title, date: s.date, time: s.time, status: s.status, summary: s.summary,
-        attendance: s.attendance.map((a) => ({ name: a.name, status: a.status, reason: a.reason ?? a.reasonText })),
+        id: s.id, title: s.title, date: s.date, time: s.time, status: s.status, link: s.link,
+        notes: s.notes, summary: s.summary,
+        attendance: s.attendance.map((a) => ({
+          entryId: a.id, userId: a.userId, name: a.name, status: a.status, reason: a.reason ?? a.reasonText,
+        })),
       })),
+  },
+  "users.list": {
+    about: "сотрудники, которым можно назначать задачи и лиды (id, имя, логин, роль)",
+    needs: "crm.view",
+    run: async () => listAssignableUsers(),
+  },
+  performance: {
+    about: "перформанс команды за 7, 30 или 90 дней (days): коммиты, PR, задачи Jira, часы, последняя активность",
+    needs: "team.view",
+    run: async (args) => buildPerformance(period(args)),
+  },
+  "performance.person": {
+    about: "подробно по человеку (name — как на странице «Перформанс», days): цикл задач, возвраты, просрочки, PR, репозитории",
+    needs: "team.view",
+    run: async (args) => buildPersonDetail(required(args, "name", 80), period(args)),
   },
   finance: {
     about: "финансы по валютам: получено, расходы, баланс, долги клиентов",
@@ -496,6 +553,162 @@ const OPERATIONS: Record<string, Operation> = {
       return { id: (comment as { id?: string } | undefined)?.id };
     },
   },
+  "task.assign": {
+    about: "назначить задачу другому сотруднику (id, ownerId из users.list)",
+    needs: "task.assign",
+    write: true,
+    run: async (args) => {
+      const updated = await updateTask(required(args, "id", 80), { ownerId: required(args, "ownerId", 80) });
+      return { id: (updated as Task | undefined)?.id, ownerId: (updated as Task | undefined)?.ownerId };
+    },
+  },
+  "project.create": {
+    about: "проект клиента (clientId, name; leadId, description, deadline, requirements; price — только с правом на деньги)",
+    needs: "project.write",
+    write: true,
+    run: async (args, user) => {
+      const price = money(args, "price");
+      if (price && !can(user.role, "finance.write")) throw new AuthzError("Цену проекта меняет только тот, кому можно деньги.");
+      const project = await createClientProject({
+        clientId: required(args, "clientId", 80),
+        name: required(args, "name", 200),
+        leadId: str(args, "leadId", 80),
+        description: str(args, "description", 5000),
+        deadline: day(args, "deadline"),
+        requirements: str(args, "requirements", 5000),
+        price,
+      });
+      return { id: project.id };
+    },
+  },
+  "project.update": {
+    about: "изменить проект (id + status, deadline, name, description, requirements, notes; price — с правом на деньги)",
+    needs: "project.write",
+    write: true,
+    run: async (args) => {
+      const projectId = required(args, "id", 80);
+      const patch = pick(args, {
+        name: str, description: (a: Args, k: string) => str(a, k, 5000),
+        requirements: (a: Args, k: string) => str(a, k, 5000), notes: (a: Args, k: string) => str(a, k, 5000),
+        status: (a: Args, k: string) => oneOf(a, k, CLIENT_PROJECT_STATUSES),
+        deadline: day, price: money,
+      }) as Partial<ClientProject>;
+      const updated = await updateClientProject(projectId, patch);
+      return { id: projectId, status: updated.status, deadline: updated.deadline };
+    },
+  },
+  "payment.add": {
+    about: "оплата от клиента по проекту (projectId, amount, currency, paidAt ГГГГ-ММ-ДД, note) — только по слову Сардора",
+    needs: "finance.write",
+    write: true,
+    run: async (args) => {
+      const payment = await addPayment(required(args, "projectId", 80), {
+        amount: amount(args, "amount"),
+        currency: (str(args, "currency", 10) ?? "USD").toUpperCase(),
+        paidAt: day(args, "paidAt") ?? wallNow().date,
+        note: str(args, "note", 500),
+      });
+      return { id: (payment as { id?: string } | undefined)?.id };
+    },
+  },
+  "expense.add": {
+    about: "расход (amount, currency, paidAt, category SALARY/SERVICES/MARKETING/TAXES/OTHER, note, projectId) — только по слову Сардора",
+    needs: "finance.write",
+    write: true,
+    run: async (args) => {
+      const expense = await addExpense({
+        amount: amount(args, "amount"),
+        currency: (str(args, "currency", 10) ?? "UZS").toUpperCase(),
+        paidAt: day(args, "paidAt") ?? wallNow().date,
+        category: oneOf(args, "category", EXPENSE_CATEGORIES) ?? "OTHER",
+        note: str(args, "note", 500),
+        projectId: str(args, "projectId", 80),
+      });
+      return { id: (expense as { id?: string } | undefined)?.id };
+    },
+  },
+  "standup.create": {
+    about: "созвон (title, date ГГГГ-ММ-ДД, time ЧЧ:ММ по Ташкенту, link, agenda)",
+    needs: "standup.manage",
+    write: true,
+    run: async (args) => {
+      const time = required(args, "time", 5);
+      if (!/^\d{2}:\d{2}$/.test(time)) throw new InputError("time: ЧЧ:ММ");
+      const standup = await createStandup({
+        title: required(args, "title", 200),
+        date: day(args, "date") ?? wallNow().date,
+        time,
+        link: str(args, "link", 500),
+        agenda: str(args, "agenda", 5000),
+      });
+      return { id: standup.id };
+    },
+  },
+  "standup.notes": {
+    about: "тема, ссылка, повестка или заметки созвона (id + title, link, agenda, notes)",
+    needs: "standup.manage",
+    write: true,
+    run: async (args) => {
+      const patch = pick(args, {
+        title: str, link: str,
+        agenda: (a: Args, k: string) => str(a, k, 5000), notes: (a: Args, k: string) => str(a, k, 10000),
+      }) as { title?: string; link?: string; agenda?: string; notes?: string };
+      await updateStandupText(required(args, "id", 80), patch);
+      return { id: args.id };
+    },
+  },
+  "standup.summary": {
+    about: "итоги созвона (id, summary; pinned — закрепить; finish — отметить проведённым)",
+    needs: "standup.manage",
+    write: true,
+    run: async (args) => {
+      await saveSummary(required(args, "id", 80), {
+        summary: required(args, "summary", 10000),
+        pinned: args.pinned === true || args.pinned === "true",
+        finish: args.finish === true || args.finish === "true",
+      });
+      return { id: args.id };
+    },
+  },
+  "standup.attendance": {
+    about: "отметка участника (id созвона, entryId из standups.list, status PRESENT/LATE/ABSENT/WARNED/EXCUSED, reason, reasonText)",
+    needs: "standup.manage",
+    write: true,
+    run: async (args) => {
+      const status = oneOf(args, "status", ATTENDANCE_STATUSES);
+      if (!status) throw new InputError("status: обязательно");
+      await setAttendance(required(args, "id", 80), required(args, "entryId", 80), {
+        status,
+        reason: oneOf(args, "reason", ABSENCE_REASONS),
+        reasonText: str(args, "reasonText", 300),
+      });
+      return { id: args.id };
+    },
+  },
+  "standup.present": {
+    about: "отметить всех неотмеченных как присутствовавших (id)",
+    needs: "standup.manage",
+    write: true,
+    run: async (args) => {
+      await markAllPresent(required(args, "id", 80));
+      return { id: args.id };
+    },
+  },
+  "standup.task": {
+    about: "задача после созвона, попадает в трекер (id созвона, title, ownerId, dueAt, description, priority)",
+    needs: "standup.manage",
+    write: true,
+    run: async (args) => {
+      const task = await createStandupTask(required(args, "id", 80), {
+        title: required(args, "title", 200),
+        ownerId: str(args, "ownerId", 80),
+        dueAt: when(args, "dueAt"),
+        description: str(args, "description", 5000),
+        priority: oneOf(args, "priority", PRIORITIES),
+      });
+      return { id: task.id, key: `SDS-${task.number}` };
+    },
+  },
   "meeting.create": {
     about: "встреча (title, startAt с поясом; type CALL/VIDEO/MEETING/OTHER, location, description, leadId)",
     needs: "meeting.write",
@@ -543,7 +756,7 @@ export async function GET() {
     operations: Object.entries(OPERATIONS).map(([op, o]) => ({
       op, about: o.about, write: Boolean(o.write), allowed: can(user.role, o.needs),
     })),
-    notAvailable: "удаление, платежи и расходы, аккаунты и пароли, контент сайта — только люди в админке",
+    notAvailable: "удаление, аккаунты и пароли, контент сайта — только люди в админке",
   });
 }
 
