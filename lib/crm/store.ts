@@ -210,8 +210,13 @@ async function moveFromPublic(token: string): Promise<CrmData | null> {
     throw new CrmStoreError("Перенос CRM в закрытое хранилище не подтвердился — публичную копию не трогаю.");
   }
   await putPrivate(token, `${BACKUP_PREFIX}moved-${stamp()}.json`, payload, false);
-  await del(old.url);
-  publicChecked = true;
+  try {
+    await del(old.url);
+    publicChecked = true;
+  } catch {
+    // The private copy is in place; `dropPublicCopy` finishes the cleanup on a later read.
+    publicChecked = false;
+  }
   return check;
 }
 

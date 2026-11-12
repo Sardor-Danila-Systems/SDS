@@ -71,8 +71,9 @@ import {
   GET  /api/jarvis               → who Jarvis is here and which operations it may run
   POST /api/jarvis {op, ...args} → run one operation
 
-  Authorization: `Bearer <JARVIS_API_TOKEN>`; the rights are the role of the
-  CRM account `JARVIS_LOGIN` (see lib/auth.ts). Every operation goes through
+  Authorization: `Bearer <key>` (the server keeps only its SHA-256,
+  JARVIS_API_KEY_SHA256); the rights are the role of the CRM account
+  `JARVIS_LOGIN` (see lib/auth.ts). Every operation goes through
   lib/crm/repo, so permissions, the activity log and serialised writes are the
   same as in the admin UI.
 
