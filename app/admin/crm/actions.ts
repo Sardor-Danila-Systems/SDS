@@ -11,6 +11,7 @@ import {
   setUserPassword,
   createTeamUser,
   setUserActive,
+  deleteUser,
   addPayment,
   deleteExpense,
   createClientProject,
@@ -424,6 +425,10 @@ export async function setUserActiveAction(
   active: boolean,
 ): Promise<ActionResult> {
   return run(() => setUserActive(userId, active));
+}
+
+export async function deleteUserAction(userId: string): Promise<ActionResult> {
+  return run(() => deleteUser(userId));
 }
 
 /* --------------------------------- tracker -------------------------------- */

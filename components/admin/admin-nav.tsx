@@ -9,8 +9,7 @@ import {
   CalendarDays,
   Columns3,
   FolderKanban,
-  Gauge,
-  KanbanSquare,
+  Activity,
   Globe,
   LayoutDashboard,
   Menu,
@@ -57,13 +56,6 @@ const GROUPS: NavGroup[] = [
     ],
   },
   {
-    label: "Задачи",
-    items: [
-      { href: "/admin/control", label: "Контроль", icon: Gauge, roles: ["ADMIN"] },
-      { href: "/admin/tracker", label: "Трекер", icon: KanbanSquare },
-    ],
-  },
-  {
     label: "Продажи",
     items: [
       { href: "/admin/crm/leads", label: "Лиды", icon: Users },
@@ -85,6 +77,7 @@ const GROUPS: NavGroup[] = [
     items: [
       { href: "/admin/team", label: "Команда", icon: UsersRound, roles: ["ADMIN"] },
       { href: "/admin/standups", label: "Созвоны", icon: Video, roles: ["ADMIN"] },
+      { href: "/admin/performance", label: "Dev performance", icon: Activity, roles: ["ADMIN"] },
     ],
   },
   {

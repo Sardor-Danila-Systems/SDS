@@ -1336,6 +1336,27 @@ export async function setUserActive(userId: string, active: boolean) {
   });
 }
 
+/** Remove an account for good. Only a disabled one, and never your own. */
+export async function deleteUser(userId: string) {
+  const actor = await requirePermission("users.manage");
+  if (userId === actor.id) throw new Error("Нельзя удалить собственный аккаунт.");
+
+  return mutateCrm((data) => {
+    const index = data.users.findIndex((u) => u.id === userId);
+    const user = data.users[index];
+    if (!user) throw new Error("Пользователь не найден.");
+    if (user.active) throw new Error("Сначала отключите аккаунт.");
+    data.users.splice(index, 1);
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "user",
+      entityId: user.id,
+      summary: `Аккаунт удалён: ${user.name}`,
+    });
+    return user;
+  });
+}
+
 const MIN_PASSWORD = 8;
 
 async function applyPassword(user: User, password: string) {
