@@ -69,14 +69,14 @@ export interface PerformanceData {
   generatedAt: string;
 }
 
-interface PersonMap {
+export interface PersonMap {
   name: string;
   github?: string;
   jira?: string;
   aliases?: string[];
 }
 
-function personMap(): PersonMap[] {
+export function personMap(): PersonMap[] {
   try {
     const raw = JSON.parse(process.env.PERF_PEOPLE ?? "[]");
     return Array.isArray(raw) ? (raw as PersonMap[]) : [];
@@ -87,7 +87,7 @@ function personMap(): PersonMap[] {
 
 /* --------------------------------- helpers -------------------------------- */
 
-async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);
   let next = 0;
   await Promise.all(
@@ -101,7 +101,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
   return out;
 }
 
-async function getJson<T>(url: string, init: RequestInit): Promise<T> {
+export async function getJson<T>(url: string, init: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`${new URL(url).host}: ${res.status}`);
   return (await res.json()) as T;
@@ -258,12 +258,36 @@ interface JiraIssue {
   };
 }
 
-interface JiraHistory {
+export interface JiraHistory {
   created: string;
-  items: { field: string; to: string | null; toString: string | null; fromString: string | null }[];
+  items: { field: string; from: string | null; to: string | null; toString: string | null; fromString: string | null }[];
 }
 
-interface JiraResult {
+/**
+  Who actually did a Jira issue: the assignee at the moment it first entered a
+  status of the "in progress" category. The team reassigns finished work to
+  the reviewer before closing it, so the current assignee is not the author.
+  Returns undefined when the issue never started with someone on it.
+*/
+export function jiraDoer(
+  histories: JiraHistory[],
+  categoryOf: Map<string, string>,
+  currentAssignee?: string,
+): string | undefined {
+  const sorted = [...histories].sort((a, b) => a.created.localeCompare(b.created));
+  const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+  // Replay assignee changes; the "from" of the first change is the original assignee.
+  const firstAssign = sorted.flatMap((h) => h.items).find((it) => it.field === "assignee");
+  let assignee = firstAssign ? str(firstAssign.fromString) : currentAssignee;
+  for (const h of sorted) {
+    for (const it of h.items) if (it.field === "assignee") assignee = str(it.toString);
+    const started = h.items.some((it) => it.field === "status" && it.to && categoryOf.get(it.to) === "indeterminate");
+    if (started && assignee) return assignee;
+  }
+  return undefined;
+}
+
+export interface JiraResult {
   done: Map<string, number>;
   inProgress: Map<string, number>;
   hours: Map<string, number>;
@@ -335,21 +359,8 @@ async function loadJira(sinceDate: string, since: string): Promise<JiraResult> {
       histories.push(...page.values);
       if (page.isLast !== false || page.values.length < 100) break;
     }
-    histories.sort((a, b) => a.created.localeCompare(b.created));
-    // Replay assignee changes; the "from" of the first change is the original assignee.
-    const firstAssign = histories.flatMap((h) => h.items).find((it) => it.field === "assignee");
-    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
-    let assignee = firstAssign ? str(firstAssign.fromString) : issue.fields.assignee?.displayName;
-    for (const h of histories) {
-      for (const it of h.items) {
-        if (it.field === "assignee") assignee = str(it.toString);
-      }
-      const started = h.items.some((it) => it.field === "status" && it.to && categoryOf.get(it.to) === "indeterminate");
-      if (started && assignee) {
-        doer.set(issue.key, assignee);
-        return;
-      }
-    }
+    const who = jiraDoer(histories, categoryOf, issue.fields.assignee?.displayName);
+    if (who) doer.set(issue.key, who);
   });
 
   for (const issue of issues) {
