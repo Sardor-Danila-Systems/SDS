@@ -128,16 +128,35 @@ async function loadGithub(since: string): Promise<GithubResult> {
   const result: GithubResult = { commits: new Map(), prs: new Map(), last: new Map(), daily: new Map() };
   const bump = (m: Map<string, number>, key: string) => m.set(key, (m.get(key) ?? 0) + 1);
 
-  await mapLimit(live, 5, async (repo) => {
-    const [commits, pulls] = await Promise.all([
-      getJson<GhCommit[]>(`${api}/repos/${org}/${repo.name}/commits?since=${since}&per_page=100`, init).catch(
-        () => [] as GhCommit[], // empty repo answers 409
-      ),
-      getJson<GhPull[]>(
-        `${api}/repos/${org}/${repo.name}/pulls?state=closed&sort=updated&direction=desc&per_page=100`,
+  // Busy repos pass 100 commits a month, so walk the pages (capped at 10).
+  const commitsOf = async (repo: string) => {
+    const all: GhCommit[] = [];
+    for (let page = 1; page <= 10; page++) {
+      const batch = await getJson<GhCommit[]>(
+        `${api}/repos/${org}/${repo}/commits?since=${since}&per_page=100&page=${page}`,
         init,
-      ).catch(() => [] as GhPull[]),
-    ]);
+      ).catch(() => [] as GhCommit[]); // empty repo answers 409
+      all.push(...batch);
+      if (batch.length < 100) break;
+    }
+    return all;
+  };
+  // Closed PRs come newest-updated first; stop once a page is entirely older than the period.
+  const pullsOf = async (repo: string) => {
+    const all: GhPull[] = [];
+    for (let page = 1; page <= 5; page++) {
+      const batch = await getJson<(GhPull & { updated_at: string })[]>(
+        `${api}/repos/${org}/${repo}/pulls?state=closed&sort=updated&direction=desc&per_page=100&page=${page}`,
+        init,
+      ).catch(() => [] as (GhPull & { updated_at: string })[]);
+      all.push(...batch);
+      if (batch.length < 100 || batch.every((p) => p.updated_at < since)) break;
+    }
+    return all;
+  };
+
+  await mapLimit(live, 5, async (repo) => {
+    const [commits, pulls] = await Promise.all([commitsOf(repo.name), pullsOf(repo.name)]);
     for (const c of commits) {
       const who = c.author?.login ?? c.commit.author.name;
       bump(result.commits, who);
@@ -162,6 +181,11 @@ interface JiraIssue {
     resolutiondate: string | null;
     timespent: number | null;
   };
+}
+
+interface JiraHistory {
+  created: string;
+  items: { field: string; to: string | null; toString: string | null; fromString: string | null }[];
 }
 
 interface JiraResult {
@@ -206,8 +230,55 @@ async function loadJira(sinceDate: string, since: string): Promise<JiraResult> {
   const r: JiraResult = { done: new Map(), inProgress: new Map(), hours: new Map(), last: new Map() };
   const add = (m: Map<string, number>, k: string, n = 1) => m.set(k, (m.get(k) ?? 0) + n);
 
+  /*
+    The team hands finished work to the reviewer (the PM) before closing it:
+    the issue is reassigned to him and he moves it to Done. Crediting the
+    current assignee would give him everyone's tasks. The developer is the
+    person the issue was assigned to when it first entered an "in progress"
+    status; without such a transition, the current assignee stands.
+  */
+  const categoryOf = new Map<string, string>();
+  try {
+    const statuses = await getJson<{ id: string; statusCategory: { key: string } }[]>(`${base}/rest/api/3/status`, init);
+    for (const st of statuses) categoryOf.set(st.id, st.statusCategory.key);
+  } catch {
+    // Without the status map every issue falls back to its current assignee.
+  }
+  const counted = issues.filter((i) => {
+    const c = i.fields.status.statusCategory.key;
+    return c === "indeterminate" || (c === "done" && !!i.fields.resolutiondate && i.fields.resolutiondate >= since);
+  });
+  const doer = new Map<string, string>();
+  await mapLimit(categoryOf.size ? counted : [], 6, async (issue) => {
+    const histories: JiraHistory[] = [];
+    for (let startAt = 0; startAt < 500; startAt += 100) {
+      const page = await getJson<{ values: JiraHistory[]; isLast?: boolean; total?: number }>(
+        `${base}/rest/api/3/issue/${issue.key}/changelog?startAt=${startAt}&maxResults=100`,
+        init,
+      ).catch(() => null);
+      if (!page) return;
+      histories.push(...page.values);
+      if (page.isLast !== false || page.values.length < 100) break;
+    }
+    histories.sort((a, b) => a.created.localeCompare(b.created));
+    // Replay assignee changes; the "from" of the first change is the original assignee.
+    const firstAssign = histories.flatMap((h) => h.items).find((it) => it.field === "assignee");
+    const str = (v: unknown) => (typeof v === "string" ? v : undefined);
+    let assignee = firstAssign ? str(firstAssign.fromString) : issue.fields.assignee?.displayName;
+    for (const h of histories) {
+      for (const it of h.items) {
+        if (it.field === "assignee") assignee = str(it.toString);
+      }
+      const started = h.items.some((it) => it.field === "status" && it.to && categoryOf.get(it.to) === "indeterminate");
+      if (started && assignee) {
+        doer.set(issue.key, assignee);
+        return;
+      }
+    }
+  });
+
   for (const issue of issues) {
-    const who = issue.fields.assignee?.displayName;
+    const who = doer.get(issue.key) ?? issue.fields.assignee?.displayName;
     if (!who) continue;
     const category = issue.fields.status.statusCategory.key;
     if (category === "done" && issue.fields.resolutiondate && issue.fields.resolutiondate >= since) {
