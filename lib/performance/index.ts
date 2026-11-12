@@ -9,7 +9,10 @@ import { requirePermission } from "@/lib/crm/repo";
   says so — it never fails as a whole.
 
   People are matched across systems through PERF_PEOPLE, a JSON array like
-    [{"name":"Сардор","github":"sardor-login","jira":"Сардор Джамолов"}]
+    [{"name":"Даня","github":"DanyaNextgen","jira":"Danila","aliases":["frozzen1337","Danya"]}]
+  `aliases` are any other names the person commits or logs time under (a git
+  author name that is not linked to the GitHub account shows up as its own
+  name). Matching ignores case.
   Anyone not listed still appears, under their own GitHub login or Jira name.
 */
 
@@ -51,6 +54,7 @@ interface PersonMap {
   name: string;
   github?: string;
   jira?: string;
+  aliases?: string[];
 }
 
 function personMap(): PersonMap[] {
@@ -254,14 +258,21 @@ export async function buildPerformance(period: Period): Promise<PerformanceData>
     return p;
   };
   const mapped = personMap();
-  const ghOwner = (login: string) => mapped.find((m) => m.github?.toLowerCase() === login.toLowerCase())?.name ?? login;
-  const jiraOwner = (display: string) => mapped.find((m) => m.jira === display)?.name ?? display;
+  const owner = (id: string) => {
+    const key = id.toLowerCase();
+    const hit = mapped.find((m) =>
+      [m.name, m.github, m.jira, ...(m.aliases ?? [])].some((v) => v?.toLowerCase() === key),
+    );
+    return hit?.name ?? id;
+  };
+  const ghOwner = owner;
+  const jiraOwner = owner;
   const later = (a?: string, b?: string) => (!a || (b && b > a) ? b : a);
 
   for (const [login, n] of g?.commits ?? []) {
     const p = row(ghOwner(login));
     p.commits += n;
-    p.github = login;
+    p.github ??= mapped.find((m) => m.name === p.name)?.github ?? login;
     p.lastActive = later(p.lastActive, g!.last.get(login));
   }
   for (const [login, n] of g?.prs ?? []) row(ghOwner(login)).prsMerged += n;

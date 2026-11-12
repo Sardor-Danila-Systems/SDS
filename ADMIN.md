@@ -64,7 +64,7 @@ git commit -m "chore: stop tracking .env"
 | `GITHUB_TOKEN`, `GITHUB_ORG` | Dev performance: коммиты и PR (токен с правом читать репозитории организации) | для раздела |
 | `JIRA_BASE_URL`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Dev performance: задачи и ворклоги (`https://sds-group.atlassian.net`) | для раздела |
 | `JIRA_PROJECTS` | Ключи проектов через запятую, по умолчанию `DEV` | нет |
-| `PERF_PEOPLE` | JSON `[{"name":"…","github":"login","jira":"Имя в Jira"}]` — склеивает одного человека из GitHub и Jira | нет |
+| `PERF_PEOPLE` | JSON `[{"name":"…","github":"login","jira":"Имя в Jira","aliases":["другое имя в git"]}]` — склеивает одного человека из GitHub и Jira; `aliases` — имена коммитов, не привязанных к аккаунту (регистр не важен) | нет |
 
 Сгенерировать секрет:
 
