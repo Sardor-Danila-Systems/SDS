@@ -99,6 +99,15 @@ export default async function PerformancePage({
                   <th className="px-3 py-2.5 text-right font-medium">В работе</th>
                   <th className="px-3 py-2.5 text-right font-medium">Коммиты</th>
                   <th className="px-3 py-2.5 text-right font-medium">PR</th>
+                  <th className="px-3 py-2.5 text-right font-medium" title="GitHub issues: открыл / закрыл за период">
+                    Issues +/✓
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-medium" title="Открытые issues на человеке сейчас">
+                    Висит
+                  </th>
+                  <th className="px-3 py-2.5 text-right font-medium" title="Комментарии в issues и PR">
+                    Комм.
+                  </th>
                   <th className="px-5 py-2.5 text-right font-medium">Последняя активность</th>
                 </tr>
               </thead>
@@ -116,6 +125,11 @@ export default async function PerformancePage({
                     <td className="px-3 py-3 text-right font-mono tabular">{p.jiraInProgress}</td>
                     <td className="px-3 py-3 text-right font-mono tabular">{p.commits}</td>
                     <td className="px-3 py-3 text-right font-mono tabular">{p.prsMerged}</td>
+                    <td className="px-3 py-3 text-right font-mono tabular">
+                      {p.issuesOpened} / {p.issuesClosed}
+                    </td>
+                    <td className="px-3 py-3 text-right font-mono tabular">{p.issuesOpen}</td>
+                    <td className="px-3 py-3 text-right font-mono tabular">{p.comments}</td>
                     <td className="px-5 py-3 text-right text-muted-foreground">{formatDate(p.lastActive)}</td>
                   </tr>
                 ))}

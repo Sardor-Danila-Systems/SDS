@@ -26,11 +26,30 @@ export interface PersonStats {
   prsMerged: number;
   jiraDone: number;
   jiraInProgress: number;
+  /** GitHub issues the person opened inside the period. */
+  issuesOpened: number;
+  /** GitHub issues closed inside the period, credited to the assignee (else the author). */
+  issuesClosed: number;
+  /** GitHub issues open right now that are on the person (assignee, else author). */
+  issuesOpen: number;
+  /** Comments on issues and PRs inside the period. */
+  comments: number;
   /** Hours logged in Jira worklogs inside the period. */
   hoursLogged: number;
   /** Last activity (commit or Jira resolution), ISO. */
   lastActive?: string;
 }
+
+type NumKey =
+  | "commits"
+  | "prsMerged"
+  | "jiraDone"
+  | "jiraInProgress"
+  | "hoursLogged"
+  | "issuesOpened"
+  | "issuesClosed"
+  | "issuesOpen"
+  | "comments";
 
 export interface SourceStatus {
   ok: boolean;
@@ -44,7 +63,7 @@ export interface PerformanceData {
   people: PersonStats[];
   github: SourceStatus;
   jira: SourceStatus;
-  totals: Pick<PersonStats, "commits" | "prsMerged" | "jiraDone" | "jiraInProgress" | "hoursLogged">;
+  totals: Pick<PersonStats, NumKey>;
   /** Commits per day, oldest first, for the activity strip. */
   daily: { date: string; commits: number }[];
   generatedAt: string;
@@ -99,7 +118,23 @@ interface GhPull {
   user: { login: string } | null;
 }
 
+interface GhIssue {
+  user: { login: string } | null;
+  assignees?: { login: string }[];
+  state: "open" | "closed";
+  created_at: string;
+  closed_at: string | null;
+  pull_request?: unknown;
+}
+interface GhComment {
+  user: { login: string } | null;
+}
+
 interface GithubResult {
+  issuesOpened: Map<string, number>;
+  issuesClosed: Map<string, number>;
+  issuesOpen: Map<string, number>;
+  comments: Map<string, number>;
   commits: Map<string, number>;
   prs: Map<string, number>;
   last: Map<string, string>;
@@ -125,7 +160,16 @@ async function loadGithub(since: string): Promise<GithubResult> {
   );
   const live = repos.filter((r) => !r.archived);
 
-  const result: GithubResult = { commits: new Map(), prs: new Map(), last: new Map(), daily: new Map() };
+  const result: GithubResult = {
+    commits: new Map(),
+    prs: new Map(),
+    last: new Map(),
+    daily: new Map(),
+    issuesOpened: new Map(),
+    issuesClosed: new Map(),
+    issuesOpen: new Map(),
+    comments: new Map(),
+  };
   const bump = (m: Map<string, number>, key: string) => m.set(key, (m.get(key) ?? 0) + 1);
 
   // Busy repos pass 100 commits a month, so walk the pages (capped at 10).
@@ -155,8 +199,39 @@ async function loadGithub(since: string): Promise<GithubResult> {
     return all;
   };
 
+  // Generic paginated list (capped at `max` pages); errors read as empty.
+  const pages = async <T,>(url: string, max = 5) => {
+    const all: T[] = [];
+    for (let page = 1; page <= max; page++) {
+      const batch = await getJson<T[]>(`${url}&per_page=100&page=${page}`, init).catch(() => [] as T[]);
+      all.push(...batch);
+      if (batch.length < 100) break;
+    }
+    return all;
+  };
+
   await mapLimit(live, 5, async (repo) => {
-    const [commits, pulls] = await Promise.all([commitsOf(repo.name), pullsOf(repo.name)]);
+    const base = `${api}/repos/${org}/${repo.name}`;
+    const [commits, pulls, touched, open, comments] = await Promise.all([
+      commitsOf(repo.name),
+      pullsOf(repo.name),
+      // `since` filters by last update, which covers anything opened or closed in the period.
+      pages<GhIssue>(`${base}/issues?state=all&since=${since}`),
+      pages<GhIssue>(`${base}/issues?state=open`),
+      pages<GhComment>(`${base}/issues/comments?since=${since}`, 10),
+    ]);
+    const issueOwner = (i: GhIssue) => i.assignees?.[0]?.login ?? i.user?.login;
+    for (const i of touched) {
+      if (i.pull_request) continue; // the issues API also returns PRs
+      if (i.user && i.created_at >= since) bump(result.issuesOpened, i.user.login);
+      const who = issueOwner(i);
+      if (who && i.state === "closed" && i.closed_at && i.closed_at >= since) bump(result.issuesClosed, who);
+    }
+    for (const i of open) {
+      const who = issueOwner(i);
+      if (who && !i.pull_request) bump(result.issuesOpen, who);
+    }
+    for (const c of comments) if (c.user && !c.user.login.endsWith("[bot]")) bump(result.comments, c.user.login);
     for (const c of commits) {
       const who = c.author?.login ?? c.commit.author.name;
       bump(result.commits, who);
@@ -325,7 +400,22 @@ export async function buildPerformance(period: Period): Promise<PerformanceData>
   const people = new Map<string, PersonStats>();
   const row = (name: string) => {
     let p = people.get(name);
-    if (!p) people.set(name, (p = { name, commits: 0, prsMerged: 0, jiraDone: 0, jiraInProgress: 0, hoursLogged: 0 }));
+    if (!p)
+      people.set(
+        name,
+        (p = {
+          name,
+          commits: 0,
+          prsMerged: 0,
+          jiraDone: 0,
+          jiraInProgress: 0,
+          hoursLogged: 0,
+          issuesOpened: 0,
+          issuesClosed: 0,
+          issuesOpen: 0,
+          comments: 0,
+        }),
+      );
     return p;
   };
   const mapped = personMap();
@@ -347,6 +437,10 @@ export async function buildPerformance(period: Period): Promise<PerformanceData>
     p.lastActive = later(p.lastActive, g!.last.get(login));
   }
   for (const [login, n] of g?.prs ?? []) row(ghOwner(login)).prsMerged += n;
+  for (const [login, n] of g?.issuesOpened ?? []) row(ghOwner(login)).issuesOpened += n;
+  for (const [login, n] of g?.issuesClosed ?? []) row(ghOwner(login)).issuesClosed += n;
+  for (const [login, n] of g?.issuesOpen ?? []) row(ghOwner(login)).issuesOpen += n;
+  for (const [login, n] of g?.comments ?? []) row(ghOwner(login)).comments += n;
   for (const [who, n] of j?.done ?? []) {
     const p = row(jiraOwner(who));
     p.jiraDone += n;
@@ -355,16 +449,17 @@ export async function buildPerformance(period: Period): Promise<PerformanceData>
   for (const [who, n] of j?.inProgress ?? []) row(jiraOwner(who)).jiraInProgress += n;
   for (const [who, h] of j?.hours ?? []) row(jiraOwner(who)).hoursLogged += h;
 
+  const score = (p: PersonStats) => p.commits + p.jiraDone * 3 + p.prsMerged * 2 + p.issuesClosed * 2;
   const list = [...people.values()]
     .map((p) => ({ ...p, hoursLogged: Math.round(p.hoursLogged * 10) / 10 }))
-    .sort((a, b) => b.commits + b.jiraDone * 3 + b.prsMerged * 2 - (a.commits + a.jiraDone * 3 + a.prsMerged * 2));
+    .sort((a, b) => score(b) - score(a));
 
   const daily = Array.from({ length: period }, (_, i) => {
     const date = new Date(sinceMs + (i + 1) * 86_400_000).toISOString().slice(0, 10);
     return { date, commits: g?.daily.get(date) ?? 0 };
   });
 
-  const sum = (k: "commits" | "prsMerged" | "jiraDone" | "jiraInProgress" | "hoursLogged") =>
+  const sum = (k: NumKey) =>
     Math.round(list.reduce((a, p) => a + p[k], 0) * 10) / 10;
 
   return {
@@ -379,6 +474,10 @@ export async function buildPerformance(period: Period): Promise<PerformanceData>
       jiraDone: sum("jiraDone"),
       jiraInProgress: sum("jiraInProgress"),
       hoursLogged: sum("hoursLogged"),
+      issuesOpened: sum("issuesOpened"),
+      issuesClosed: sum("issuesClosed"),
+      issuesOpen: sum("issuesOpen"),
+      comments: sum("comments"),
     },
     daily,
     generatedAt: new Date().toISOString(),
