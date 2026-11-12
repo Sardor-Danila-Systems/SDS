@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { SignJWT, jwtVerify } from "jose";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { Role, User } from "@/types/crm";
 import { can } from "./crm/rbac";
 import { readCrm, mutateCrm } from "./crm/store";
@@ -19,6 +19,9 @@ const secret = new TextEncoder().encode(
   - the bootstrap admin from ADMIN_LOGIN / ADMIN_PASSWORD, which always works
     and cannot be locked out;
   - CRM users stored in the document, with PBKDF2-hashed passwords.
+
+  And one for a machine: Jarvis, the AI assistant, calls /api/jarvis with
+  `Authorization: Bearer <JARVIS_API_TOKEN>` — see `jarvisSession`.
 */
 
 export interface SessionUser {
@@ -62,6 +65,10 @@ export async function destroySession() {
  * repository call ask for it, and re-verifying the JWT each time is pure cost.
  */
 export const getSessionUser = cache(async function getSessionUser(): Promise<SessionUser | null> {
+  // A bearer key is Jarvis; a wrong key is refused rather than falling back to cookies.
+  const authorization = (await headers()).get("authorization");
+  if (authorization && /^Bearer\s/i.test(authorization.trim())) return jarvisSession(authorization);
+
   const store = await cookies();
   const token = store.get(COOKIE_NAME)?.value;
   if (!token) return null;
@@ -87,6 +94,33 @@ export const getSessionUser = cache(async function getSessionUser(): Promise<Ses
     return null;
   }
 });
+
+/**
+ * Jarvis works as a member of the team, not as a password.
+ *
+ * The key (`JARVIS_API_TOKEN`, 32+ characters) only says "this is Jarvis";
+ * what Jarvis may do is the role of the CRM account whose login is
+ * `JARVIS_LOGIN` (default `jarvis`), created on the «Команда» page. So:
+ * - rights are chosen there, like for any employee, and checked by the same
+ *   `requirePermission` in every operation;
+ * - deactivating that account revokes the key at once;
+ * - every change lands in the activity log under that account's name.
+ *
+ * Only reachable on /api/jarvis: everything else under /admin and /api/admin
+ * is behind the cookie check in middleware.
+ */
+async function jarvisSession(authorization: string): Promise<SessionUser | null> {
+  const expected = process.env.JARVIS_API_TOKEN;
+  if (!expected || expected.length < 32) return null;
+  const match = /^Bearer\s+(.+)$/i.exec(authorization.trim());
+  if (!match || !safeEqual(match[1].trim(), expected)) return null;
+
+  const login = (process.env.JARVIS_LOGIN ?? "jarvis").trim().toLowerCase();
+  const { users } = await readCrm();
+  const account = users.find((u) => u.login.toLowerCase() === login && u.active);
+  if (!account) return null;
+  return { id: account.id, name: account.name, login: account.login, role: account.role };
+}
 
 /** Editing the public site's content is the admin's job, not the sales team's. */
 export async function canEditContent() {
