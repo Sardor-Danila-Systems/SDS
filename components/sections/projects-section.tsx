@@ -2,6 +2,7 @@ import { useTranslations } from "next-intl";
 import { Container } from "@/components/layout/container";
 import { Section, SectionHeading } from "@/components/layout/section";
 import { Reveal } from "@/components/animations/reveal";
+import { ImageStreamHero } from "@/components/ui/image-stream-hero";
 import { ProjectCard } from "@/components/projects/project-card";
 import type { Locale, Project } from "@/types/project";
 
@@ -33,6 +34,13 @@ export function ProjectsSection({
   const t = useTranslations("Work");
   const tCommercial = useTranslations("Commercial");
 
+  // Real captures only: the corridor is a showcase of shipped interfaces.
+  const streamImages = [...products, ...commercialProjects]
+    .flatMap((project) => [project.cover, ...project.images])
+    .filter((image): image is NonNullable<typeof image> => Boolean(image))
+    .map((image) => ({ src: image.src }))
+    .filter((image, i, all) => all.findIndex((x) => x.src === image.src) === i);
+
   return (
     <Section id="projects">
       <Container>
@@ -42,7 +50,18 @@ export function ProjectsSection({
           description={t("subtitle")}
         />
 
-        <div className="mt-16 grid gap-x-8 gap-y-16 sm:grid-cols-2 lg:mt-20 lg:gap-x-10 lg:gap-y-20">
+        {streamImages.length > 0 ? (
+          <Reveal className="mt-10 lg:mt-12">
+            <ImageStreamHero
+              images={streamImages}
+              axis={50}
+              speed={22}
+              className="aspect-[16/9] max-h-[640px] w-full rounded-lg border border-border bg-surface"
+            />
+          </Reveal>
+        ) : null}
+
+        <div className="mt-16 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:mt-12 lg:gap-x-10 lg:gap-y-14">
           {products.map((project, i) => (
             <ProjectCard
               key={project.slug}
@@ -55,8 +74,8 @@ export function ProjectsSection({
         </div>
 
         {commercialProjects.length > 0 ? (
-          <div className="mt-24 border-t border-border-strong pt-12 lg:mt-32 lg:pt-16">
-            <Reveal>
+          <div className="mt-16 border-t border-border-strong pt-10 lg:mt-20 lg:pt-12">
+            <Reveal from="left">
               <span className="label">{tCommercial("label")}</span>
               <h3 className="display-3 mt-4 max-w-2xl text-balance">
                 {tCommercial("title")}
@@ -66,7 +85,7 @@ export function ProjectsSection({
               </p>
             </Reveal>
 
-            <div className="mt-12 grid gap-x-8 gap-y-16 sm:grid-cols-2 lg:gap-x-10 lg:gap-y-20">
+            <div className="mt-10 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:gap-x-10 lg:gap-y-14">
               {commercialProjects.map((project, i) => (
                 <ProjectCard
                   key={project.slug}

@@ -1,6 +1,7 @@
 "use client";
 
-import { motion, useReducedMotion } from "framer-motion";
+import { useRef } from "react";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { EASE } from "./reveal";
 
@@ -28,6 +29,14 @@ export function AnimatedText({
   as?: "span" | "div";
 }) {
   const reduced = useReducedMotion();
+  const ref = useRef<HTMLElement>(null);
+  /*
+    Observe the container, not the moving line: the line starts translated
+    out of its own `overflow-hidden` mask, so an IntersectionObserver on it
+    sees it as fully clipped and `whileInView` would never fire.
+  */
+  const inView = useInView(ref, { once: true, margin: "0px 0px -12% 0px" });
+  const play = trigger === "mount" || inView;
 
   /*
     Both states must always animate the same properties. `useReducedMotion`
@@ -40,18 +49,13 @@ export function AnimatedText({
   const shown = { opacity: 1, y: "0%" };
 
   return (
-    <Tag className={cn("block", className)}>
+    <Tag ref={ref as never} className={cn("block", className)}>
       {lines.map((line, i) => (
         <span key={`${line}-${i}`} className="block overflow-hidden pb-[0.06em]">
           <motion.span
             className="block"
             initial={hidden}
-            {...(trigger === "mount"
-              ? { animate: shown }
-              : {
-                  whileInView: shown,
-                  viewport: { once: true, margin: "0px 0px -12% 0px" },
-                })}
+            animate={play ? shown : hidden}
             transition={{
               duration: 1,
               ease: EASE,

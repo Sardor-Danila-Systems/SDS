@@ -27,9 +27,9 @@ export function Section({
       id={id}
       className={cn(
         "scroll-mt-24",
-        size === "compact" && "py-16 sm:py-20 lg:py-24",
-        size === "default" && "py-20 sm:py-28 lg:py-36",
-        size === "tall" && "py-28 sm:py-36 lg:py-48",
+        size === "compact" && "py-12 sm:py-14 lg:py-16",
+        size === "default" && "py-14 sm:py-18 lg:py-24",
+        size === "tall" && "py-20 sm:py-24 lg:py-32",
         rule && tone !== "ink" && "border-t border-border",
         tone === "soft" && "bg-surface",
         tone === "ink" && "bg-ink text-ink-foreground",
@@ -64,13 +64,17 @@ export function SectionHeading({
   const isInk = tone === "ink";
 
   return (
-    <Reveal className={cn("grid gap-6 md:grid-cols-12 md:gap-8", className)}>
+    <div className={cn("grid gap-6 md:grid-cols-12 md:gap-8", className)}>
       {label ? (
-        <div className="md:col-span-3">
+        <Reveal from="left" className="md:col-span-3">
           <span className={cn("label", isInk && "text-ink-muted")}>{label}</span>
-        </div>
+        </Reveal>
       ) : null}
-      <div className={cn(label ? "md:col-span-9" : "md:col-span-12")}>
+      <Reveal
+        from="right"
+        delay={0.08}
+        className={cn(label ? "md:col-span-9" : "md:col-span-12")}
+      >
         <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between md:gap-10">
           <h2 className="display-2 max-w-3xl text-balance">{title}</h2>
           {aside ? <div className="shrink-0 md:pb-2">{aside}</div> : null}
@@ -85,8 +89,8 @@ export function SectionHeading({
             {description}
           </p>
         ) : null}
-      </div>
-    </Reveal>
+      </Reveal>
+    </div>
   );
 }
 

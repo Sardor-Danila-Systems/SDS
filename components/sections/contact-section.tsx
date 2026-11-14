@@ -5,6 +5,7 @@ import { Container } from "@/components/layout/container";
 import { Section } from "@/components/layout/section";
 import { Reveal } from "@/components/animations/reveal";
 import { AnimatedText } from "@/components/animations/animated-text";
+import { GlassBackdrop } from "./glass-backdrop";
 import { ContactForm } from "./contact-form";
 
 /**
@@ -44,11 +45,17 @@ export function ContactSection() {
   ];
 
   return (
-    <Section id="contact" tone="ink" rule={false}>
+    <Section
+      id="contact"
+      tone="ink"
+      rule={false}
+      className="relative isolate overflow-hidden"
+    >
+      <GlassBackdrop />
       <Container>
         <div className="grid gap-6 md:grid-cols-12">
           <div className="md:col-span-3">
-            <Reveal>
+            <Reveal from="left">
               <span className="label text-ink-muted">{t("label")}</span>
             </Reveal>
           </div>
@@ -56,7 +63,7 @@ export function ContactSection() {
             <h2 className="display-1 text-balance">
               <AnimatedText lines={lines} trigger="inView" />
             </h2>
-            <Reveal delay={0.12}>
+            <Reveal from="right" delay={0.12}>
               <p className="lead mt-7 max-w-xl text-pretty text-ink-muted">
                 {t("subtitle")}
               </p>
@@ -64,16 +71,16 @@ export function ContactSection() {
           </div>
         </div>
 
-        <div className="mt-16 grid gap-14 md:grid-cols-12 md:gap-8 lg:mt-20">
+        <div className="mt-12 grid gap-12 md:grid-cols-12 md:gap-8 lg:mt-14">
           <div className="md:col-span-7">
-            <Reveal>
+            <Reveal from="left">
               <h3 className="label mb-8 text-ink-muted">{t("form.title")}</h3>
               <ContactForm tone="ink" />
             </Reveal>
           </div>
 
           <div className="md:col-span-4 md:col-start-9">
-            <Reveal delay={0.08}>
+            <Reveal from="right" delay={0.08}>
               <h3 className="label text-ink-muted">{t("channels.title")}</h3>
               <ul className="mt-6 border-t border-ink-line">
                 {channels.map(({ label, value, href, external }) => (

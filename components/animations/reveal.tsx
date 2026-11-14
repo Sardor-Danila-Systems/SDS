@@ -35,17 +35,41 @@ type Tag =
   | "header"
   | "figure";
 
+export type From = "up" | "left" | "right";
+
+/** Horizontal travel in px for side entrances. */
+const SIDE = 56;
+
+/**
+ * Hidden state for an entrance direction. Every direction lists the same
+ * properties (opacity, x, y, filter) so the target always clears `initial`,
+ * whatever `useReducedMotion` resolves to after hydration.
+ */
+function hiddenState(from: From, reduced: boolean, y: number) {
+  return {
+    opacity: 0,
+    x: reduced ? 0 : from === "left" ? -SIDE : from === "right" ? SIDE : 0,
+    y: reduced ? 0 : from === "up" ? y : 0,
+    filter: reduced ? "blur(0px)" : "blur(6px)",
+  };
+}
+
+const SHOWN = { opacity: 1, x: 0, y: 0, filter: "blur(0px)" };
+
 export function Reveal({
   children,
   className,
   delay = 0,
   y = 14,
+  from = "up",
   as = "div",
 }: {
   children: ReactNode;
   className?: string;
   delay?: number;
   y?: number;
+  /** Direction the element arrives from. */
+  from?: From;
   as?: Tag;
 }) {
   const reduced = useReducedMotion();
@@ -54,10 +78,10 @@ export function Reveal({
   return (
     <MotionTag
       className={className}
-      initial={{ opacity: 0, y: reduced ? 0 : y }}
-      whileInView={{ opacity: 1, y: 0 }}
+      initial={hiddenState(from, !!reduced, y)}
+      whileInView={SHOWN}
       viewport={VIEWPORT}
-      transition={{ duration: DURATION, ease: EASE, delay }}
+      transition={{ duration: DURATION + 0.1, ease: EASE, delay }}
     >
       {children}
     </MotionTag>
@@ -97,18 +121,20 @@ export function StaggerItem({
   className,
   as = "div",
   id,
+  from = "up",
 }: {
   children: ReactNode;
   className?: string;
   as?: Tag;
   id?: string;
+  from?: From;
 }) {
   const reduced = useReducedMotion();
   const MotionTag = motion[as];
 
   const itemVariants: Variants = {
-    hidden: { opacity: 0, y: reduced ? 0 : 14 },
-    show: { opacity: 1, y: 0, transition: { duration: DURATION, ease: EASE } },
+    hidden: hiddenState(from, !!reduced, 14),
+    show: { ...SHOWN, transition: { duration: DURATION + 0.1, ease: EASE } },
   };
 
   return (

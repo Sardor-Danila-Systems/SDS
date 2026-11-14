@@ -37,7 +37,11 @@ export function ProjectCard({
   const meta = variant === "team" ? copy.role : copy.category;
 
   return (
-    <Reveal as="article" delay={(index % 2) * 0.06}>
+    <Reveal
+      as="article"
+      from={index % 2 === 0 ? "left" : "right"}
+      delay={(index % 2) * 0.06}
+    >
       <Link href={`/projects/${project.slug}`} className="group block">
         <ProjectVisual
           project={project}
