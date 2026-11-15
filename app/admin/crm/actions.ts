@@ -19,6 +19,7 @@ import {
   createProposal,
   setProposalStatus,
   updateClientProject,
+  setProjectDistribution,
   convertLeadToClient,
   convertProspectToLead,
   createLead,
@@ -34,6 +35,7 @@ import {
   EXPENSE_CATEGORIES,
   ROLES,
   type ExpenseCategory,
+  type ProjectExecutor,
   type Role,
 } from "@/types/crm";
 import type {
@@ -387,6 +389,7 @@ export async function addExpenseAction(form: FormData): Promise<ActionResult> {
         category && EXPENSE_CATEGORIES.includes(category) ? category : "OTHER",
       note: text(form, "note"),
       projectId: text(form, "projectId"),
+      payee: text(form, "payee"),
     }),
   );
 }
@@ -521,4 +524,36 @@ export async function setProjectPriceAction(
   const price = money(form, "price", "currency");
   if (!price) return { ok: false, error: "Укажите стоимость." };
   return run(() => updateClientProject(projectId, { price }));
+}
+
+/**
+ * Scheme and executors of a project for the money split. The form sends
+ * `scheme` (empty — by creation date), `builtByOwners`, `lead` and `helper`.
+ */
+export async function setProjectDistributionAction(
+  projectId: string,
+  form: FormData,
+): Promise<ActionResult> {
+  const scheme = text(form, "scheme");
+  if (scheme && scheme !== "v1" && scheme !== "v2") {
+    return { ok: false, error: "Неизвестная схема." };
+  }
+  const builtByOwners = form.get("builtByOwners") === "on";
+  const lead = text(form, "lead");
+  const helper = text(form, "helper");
+  if (helper && !lead) return { ok: false, error: "Сначала укажите ведущего." };
+  if (lead && helper && lead === helper) {
+    return { ok: false, error: "Ведущий и помощник — один человек." };
+  }
+  const executors: ProjectExecutor[] = [
+    ...(lead ? [{ userId: lead, role: "lead" as const }] : []),
+    ...(helper ? [{ userId: helper, role: "helper" as const }] : []),
+  ];
+  return run(() =>
+    setProjectDistribution(projectId, {
+      schemeVersion: scheme as "v1" | "v2" | undefined,
+      builtByOwners,
+      executors,
+    }),
+  );
 }

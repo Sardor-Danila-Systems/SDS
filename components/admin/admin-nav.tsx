@@ -14,6 +14,7 @@ import {
   Globe,
   LayoutDashboard,
   Menu,
+  PieChart,
   Send,
   Users,
   UsersRound,
@@ -71,6 +72,7 @@ const GROUPS: NavGroup[] = [
       { href: "/admin/crm/clients", label: "Клиенты", icon: Briefcase },
       { href: "/admin/crm/projects", label: "Проекты", icon: FolderKanban },
       { href: "/admin/crm/finance", label: "Финансы", icon: Wallet, roles: ["ADMIN"] },
+      { href: "/admin/crm/distribution", label: "Распределение", icon: PieChart, roles: ["ADMIN"] },
     ],
   },
   {

@@ -258,6 +258,12 @@ export interface Payment {
   createdBy: string;
 }
 
+/** Who built the project, for the money split. See `lib/crm/distribution.ts`. */
+export interface ProjectExecutor {
+  userId: string;
+  role: "lead" | "helper";
+}
+
 export interface ClientProject {
   id: string;
   clientId: string;
@@ -275,6 +281,14 @@ export interface ClientProject {
   leadId?: string;
   /** Slug of the public portfolio entry, if the case was ever published. */
   portfolioSlug?: string;
+  /**
+   * Money split. All optional so records written before the split existed
+   * still read: no version means "by creation date", no executors means none.
+   */
+  schemeVersion?: "v1" | "v2";
+  /** Built by the owners themselves — the executor's share goes to the team fund. */
+  builtByOwners?: boolean;
+  executors?: ProjectExecutor[];
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
@@ -299,6 +313,11 @@ export interface Expense {
   note?: string;
   /** Optional: the client project the cost belongs to. */
   projectId?: string;
+  /**
+   * Who received the money, when it is a payout or an advance against the
+   * split: `sardor`, `dania`, `investor` or `user:<id>`. See `distribution.ts`.
+   */
+  payee?: string;
   createdBy: string;
   createdAt: string;
   deletedAt?: string;

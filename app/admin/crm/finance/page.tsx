@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getSessionUser } from "@/lib/auth";
 import { can } from "@/lib/crm/rbac";
 import {
-  AuthzError, financeSummary, listExpenses, listProjects,
+  AuthzError, financeSummary, listExpenses, listPayees, listProjects,
 } from "@/lib/crm/repo";
 import { ArrowDownToLine, ArrowUpFromLine, Hourglass, Scale, Wallet } from "lucide-react";
 import { EXPENSE_CATEGORIES, type ExpenseCategory } from "@/types/crm";
@@ -40,12 +40,13 @@ export default async function FinancePage() {
   const user = await getSessionUser();
   if (!user) redirect("/admin/login");
 
-  let summary, expenses, projects;
+  let summary, expenses, projects, payees;
   try {
-    [summary, expenses, projects] = await Promise.all([
+    [summary, expenses, projects, payees] = await Promise.all([
       financeSummary(),
       listExpenses(),
       listProjects(),
+      listPayees(),
     ]);
   } catch (error) {
     if (error instanceof AuthzError) redirect("/admin");
@@ -55,6 +56,8 @@ export default async function FinancePage() {
   const canWrite = can(user.role, "finance.write");
   const projectName = (id?: string) =>
     projects.find((p) => p.id === id)?.name;
+  const payeeName = (key?: string) =>
+    key ? (payees.find((p) => p.value === key)?.label ?? "бывший сотрудник") : undefined;
   const money = (amount: number, currency: string) =>
     amount === 0 ? "0" : formatMoney({ amount, currency });
 
@@ -145,6 +148,7 @@ export default async function FinancePage() {
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {formatDate(e.paidAt)} · {CATEGORY_LABEL[e.category]}
                       {projectName(e.projectId) ? ` · ${projectName(e.projectId)}` : ""}
+                      {e.payee ? ` · выдано: ${payeeName(e.payee)}` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
@@ -183,6 +187,10 @@ export default async function FinancePage() {
                     { value: "", label: "— общий расход —" },
                     ...projects.map((p) => ({ value: p.id, label: p.name })),
                   ]}
+                />
+                <SelectField
+                  label="Получатель (выплата по распределению)" name="payee" defaultValue=""
+                  options={[{ value: "", label: "— не выплата —" }, ...payees]}
                 />
                 <Field label="Комментарий" name="note" placeholder="Хостинг на месяц" />
               </ActionForm>
