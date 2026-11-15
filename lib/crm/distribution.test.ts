@@ -108,3 +108,14 @@ test("payouts with a payee are subtracted from what is left to receive", () => {
   assert.equal(usd!.remaining.sardor, 795);
   assert.equal(usd!.remaining.dania, 1295);
 });
+
+test("v1 projects with executors still count as without developers", () => {
+  const p = { ...kassa, executors: [{ userId: "u1", role: "lead" as const }] };
+  const [usd] = distributionReport([p as typeof kassa], [], "expected");
+  assert.equal(usd!.projects[0]!.withDevelopers, false);
+});
+
+test("expected basis puts the project in its startDate month", () => {
+  const [usd] = distributionReport([{ ...kassa, startDate: "2026-09-20" }], [], "expected");
+  assert.deepEqual(usd!.months.map((m) => m.month), ["2026-09"]);
+});
