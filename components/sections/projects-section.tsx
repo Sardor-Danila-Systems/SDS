@@ -2,7 +2,9 @@ import { useTranslations } from "next-intl";
 import { Container } from "@/components/layout/container";
 import { Section, SectionHeading } from "@/components/layout/section";
 import { Reveal } from "@/components/animations/reveal";
-import { ImageStreamHero } from "@/components/ui/image-stream-hero";
+import { ProjectStream } from "./project-stream";
+import { projectPlate } from "@/lib/project-plate";
+import { projectCopy } from "@/lib/get-projects";
 import { ProjectCard } from "@/components/projects/project-card";
 import type { Locale, Project } from "@/types/project";
 
@@ -34,12 +36,16 @@ export function ProjectsSection({
   const t = useTranslations("Work");
   const tCommercial = useTranslations("Commercial");
 
-  // Real captures only: the corridor is a showcase of shipped interfaces.
-  const streamImages = [...products, ...commercialProjects]
-    .flatMap((project) => [project.cover, ...project.images])
-    .filter((image): image is NonNullable<typeof image> => Boolean(image))
-    .map((image) => ({ src: image.src }))
-    .filter((image, i, all) => all.findIndex((x) => x.src === image.src) === i);
+  // Every project rides the corridor: real captures where we have them, a
+  // drawn title card where we do not.
+  const streamImages = [...products, ...commercialProjects].map((project, i) => {
+    const capture = project.cover ?? project.images[0];
+    return {
+      src: capture
+        ? capture.src
+        : projectPlate(project.title, projectCopy(project, locale).category, i),
+    };
+  });
 
   return (
     <Section id="projects">
@@ -52,12 +58,7 @@ export function ProjectsSection({
 
         {streamImages.length > 0 ? (
           <Reveal className="mt-10 lg:mt-12">
-            <ImageStreamHero
-              images={streamImages}
-              axis={50}
-              speed={22}
-              className="aspect-[16/9] max-h-[640px] w-full rounded-lg border border-border bg-surface"
-            />
+            <ProjectStream images={streamImages} />
           </Reveal>
         ) : null}
 
