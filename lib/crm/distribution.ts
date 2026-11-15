@@ -171,7 +171,7 @@ export function asRecord(lines: SplitLine[]): Record<string, number> {
 
 type SplitProject = Pick<
   ClientProject,
-  "id" | "name" | "createdAt" | "price" | "payments" | "schemeVersion" | "builtByOwners" | "executors"
+  "id" | "name" | "createdAt" | "startDate" | "price" | "payments" | "schemeVersion" | "builtByOwners" | "executors"
 >;
 
 export function schemeFor(project: Pick<ClientProject, "createdAt" | "schemeVersion">): SchemeVersion {
@@ -181,10 +181,13 @@ export function schemeFor(project: Pick<ClientProject, "createdAt" | "schemeVers
 
 /**
  * "With developers" — someone other than the owners is paid for the work.
- * Under v1 there is no executor share, but a project with executors listed is
- * still one the team built, so it lands in the same group.
+ * v1 projects were all built by Sardor and Dania themselves (no executor share),
+ * so they always count as "without developers".
  */
-export function withDevelopers(project: Pick<ClientProject, "builtByOwners" | "executors">): boolean {
+export function withDevelopers(
+  project: Pick<ClientProject, "builtByOwners" | "executors" | "createdAt" | "schemeVersion">,
+): boolean {
+  if (schemeFor(project) === "v1") return false;
   return !project.builtByOwners && (project.executors?.length ?? 0) > 0;
 }
 
@@ -248,8 +251,8 @@ function sortKeys(keys: Iterable<string>) {
  * The whole report, per currency — sums and dollars are never added together.
  *
  * On the `cash` basis each payment is split on its own and lands in the month
- * it was paid; on `expected` the full price lands in the month the project was
- * created.
+ * it was paid; on `expected` the full price lands in the month the project
+ * started (startDate, falling back to createdAt).
  */
 export function distributionReport(
   projects: SplitProject[],
@@ -301,7 +304,7 @@ export function distributionReport(
     const parts =
       basis === "cash"
         ? project.payments.map((p) => ({ month: p.paidAt.slice(0, 7), lines: split(p.amount, input) }))
-        : [{ month: project.createdAt.slice(0, 7), lines }];
+        : [{ month: (project.startDate || project.createdAt).slice(0, 7), lines }];
     for (const part of parts) {
       const row = month(entry, part.month);
       addInto(devs ? row.withDevelopers : row.withoutDevelopers, part.lines);
