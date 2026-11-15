@@ -9,6 +9,14 @@ import {
 } from "@/lib/auth";
 import { can, type Permission } from "./rbac";
 import { mutateCrm, readCrm } from "./store";
+import {
+  FIXED_PAYEES,
+  PARTICIPANT_LABEL,
+  SCHEME_VERSIONS,
+  distributionReport,
+  type Basis,
+  type SchemeVersion,
+} from "./distribution";
 import type {
   Activity,
   ActivityKind,
@@ -19,6 +27,7 @@ import type {
   Expense,
   ExpenseCategory,
   Lead,
+  ProjectExecutor,
   LeadStage,
   Meeting,
   Proposal,
@@ -937,12 +946,17 @@ export async function addExpense(input: {
   category: ExpenseCategory;
   note?: string;
   projectId?: string;
+  /** A payout against the money split — see `distribution.ts`. */
+  payee?: string;
 }) {
   const actor = await requirePermission("finance.write");
 
   return mutateCrm((data) => {
     if (input.projectId && !data.projects.some((p) => p.id === input.projectId)) {
       throw new Error("Проект не найден.");
+    }
+    if (input.payee && !isKnownPayee(data, input.payee)) {
+      throw new Error("Получатель не найден.");
     }
     const expense: Expense = {
       id: id(),
@@ -952,6 +966,7 @@ export async function addExpense(input: {
       category: input.category,
       note: input.note,
       projectId: input.projectId,
+      payee: input.payee,
       createdBy: actor.id,
       createdAt: now(),
     };
@@ -1079,6 +1094,86 @@ export function projectFinance(project: ClientProject) {
   const total = project.price?.amount ?? 0;
   const paid = project.payments.reduce((sum, p) => sum + p.amount, 0);
   return { currency, total, paid, remaining: Math.max(total - paid, 0) };
+}
+
+/* ------------------------------ distribution ------------------------------ */
+
+function isKnownPayee(data: CrmData, payee: string) {
+  if ((FIXED_PAYEES as readonly string[]).includes(payee)) return true;
+  return payee.startsWith("user:") && data.users.some((u) => `user:${u.id}` === payee);
+}
+
+/**
+ * Who built a project and under which scheme its money is split. Money, so
+ * it takes the finance permission, not the project one.
+ */
+export async function setProjectDistribution(
+  projectId: string,
+  input: {
+    schemeVersion?: SchemeVersion;
+    builtByOwners: boolean;
+    executors: ProjectExecutor[];
+  },
+) {
+  const actor = await requirePermission("finance.write");
+  if (input.schemeVersion && !SCHEME_VERSIONS.includes(input.schemeVersion)) {
+    throw new Error("Неизвестная схема.");
+  }
+
+  return mutateCrm((data) => {
+    const project = data.projects.find((p) => p.id === projectId && !p.deletedAt);
+    if (!project) throw new Error("Проект не найден.");
+    const seen = new Set<string>();
+    for (const executor of input.executors) {
+      if (!data.users.some((u) => u.id === executor.userId)) {
+        throw new Error("Исполнитель не найден.");
+      }
+      if (seen.has(executor.userId)) throw new Error("Исполнитель указан дважды.");
+      seen.add(executor.userId);
+    }
+
+    project.schemeVersion = input.schemeVersion;
+    project.builtByOwners = input.builtByOwners;
+    project.executors = input.executors;
+    project.updatedAt = now();
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "project",
+      entityId: project.id,
+      summary: `Распределение: ${input.schemeVersion ?? "схема по дате"}${
+        input.builtByOwners ? ", сделали собственники" : ""
+      }${input.executors.length ? `, исполнителей: ${input.executors.length}` : ""}`,
+    });
+    return project;
+  });
+}
+
+/** Who a payout can be booked to: the owners, the investor and the team. */
+export async function listPayees() {
+  await requirePermission("finance.report");
+  const { users } = await getCrm();
+  return [
+    ...FIXED_PAYEES.map((key) => ({ value: key, label: PARTICIPANT_LABEL[key] ?? key })),
+    ...users
+      .filter((u) => u.active)
+      .map((u) => ({ value: `user:${u.id}`, label: u.name })),
+  ];
+}
+
+/** Everything the distribution page shows. Admin-only, like the finance report. */
+export async function distributionOverview(basis: Basis) {
+  await requirePermission("finance.report");
+  const data = await getCrm();
+  const projects = alive(data.projects);
+  return {
+    report: distributionReport(projects, data.expenses, basis),
+    projects,
+    people: data.users
+      .filter((u) => u.active)
+      .map((u) => ({ id: u.id, name: u.name, role: u.role })),
+    /** Names for every `user:<id>`, including people since deactivated. */
+    names: Object.fromEntries(data.users.map((u) => [`user:${u.id}`, u.name])),
+  };
 }
 
 /* ------------------------------ notifications ----------------------------- */
