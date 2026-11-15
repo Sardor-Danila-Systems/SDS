@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
@@ -111,9 +112,13 @@ const ROLE_LABEL: Record<Role, string> = {
 function Brand() {
   return (
     <Link href="/admin" className="flex items-center gap-2.5 px-3">
-      <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-[0.8125rem] font-semibold tracking-tight text-primary-foreground">
-        S
-      </span>
+      <Image
+        src="/logo.png"
+        alt=""
+        width={64}
+        height={64}
+        className="size-8 rounded-full ring-1 ring-border-strong"
+      />
       <span className="text-[0.9375rem] font-semibold tracking-[-0.02em]">
         SDS <span className="font-normal text-muted-foreground">админка</span>
       </span>

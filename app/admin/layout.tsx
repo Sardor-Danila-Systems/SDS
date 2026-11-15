@@ -34,6 +34,7 @@ const mono = JetBrains_Mono({
 
 export const metadata = {
     title: "SDS — админка",
+    icons: { icon: "/logo.png", apple: "/logo.png" },
     robots: { index: false, follow: false },
 };
 

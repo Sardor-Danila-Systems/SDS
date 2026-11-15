@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { PasswordField } from "@/components/crm/password-field";
@@ -46,9 +47,14 @@ export default function AdminLoginPage() {
         <div className="flex min-h-dvh items-center justify-center px-4 py-10">
             <div className="w-full max-w-sm">
                 <div className="mb-8 flex flex-col items-center text-center">
-                    <span className="flex size-12 items-center justify-center rounded-xl bg-primary text-lg font-semibold text-primary-foreground shadow-[var(--shadow-pop)]">
-                        S
-                    </span>
+                    <Image
+                        src="/logo.png"
+                        alt="SDS"
+                        width={96}
+                        height={96}
+                        priority
+                        className="size-16 rounded-full ring-1 ring-border-strong shadow-[var(--shadow-pop)]"
+                    />
                     <h1 className="mt-5 text-2xl font-semibold tracking-[-0.03em]">Вход в SDS</h1>
                     <p className="mt-1.5 text-sm text-muted-foreground">CRM и управление сайтом</p>
                 </div>
