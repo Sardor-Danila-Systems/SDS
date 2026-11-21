@@ -1,30 +1,23 @@
 import { cache } from "react";
-import { list, put } from "@vercel/blob";
 import type { Project } from "@/types/project";
 import seedProjectsJson from "@/data/projects-seed.json";
+import { getPool, hasDatabase } from "@/lib/db";
+import { ensureSchema } from "@/lib/crm/store";
 
 /*
-  No database — the JSON that backs the whole site lives in Vercel Blob, under
-  a fixed pathname we overwrite in place. Works in serverless because nothing
-  touches the local filesystem.
+  The portfolio shown on the public site lives in the `portfolio_projects`
+  table in Neon Postgres (images stay in Vercel Blob — only their URLs are
+  stored here).
 
-  The same three rules as the CRM store keep it quick and honest:
-
-  - the blob URL is resolved once per process, so a read is one request rather
-    than `list()` + `fetch`;
-  - the parsed file is held briefly (`MEMO_TTL_MS`) so a page that asks for it
-    from several places pays for one read;
-  - it is written with `cacheControlMaxAge: 0` and read through a unique URL,
-    because a CDN copy of the previous version is indistinguishable from an
-    edit that never saved.
-
-  Anything that writes — and the admin screens, which must show what was just
-  saved — reads with `{ fresh: true }` and skips the memo entirely.
+  - Without `DATABASE_URL` (local development) or while the table is still
+    empty, the site falls back to the seed bundled in the repo, so it is never
+    blank before the first admin save.
+  - The public site reads through a short memo (`MEMO_TTL_MS`); anything that
+    writes, and the admin screens, which must show what was just saved, read
+    with `{ fresh: true }`.
 */
 
-const DATA_PATHNAME = "data/projects.json";
-
-/** How long a parsed file is reused on the public site. */
+/** How long the list is reused on the public site. */
 const MEMO_TTL_MS = 15_000;
 
 interface ProjectsFile {
@@ -35,42 +28,73 @@ interface ProjectsFile {
 // the unions in Project. It is our own file, so widen it once here.
 const seedProjects = seedProjectsJson as unknown as ProjectsFile;
 
-let blobUrl: string | null = null;
 let memo: { projects: Project[]; at: number } | null = null;
 
-async function findDataBlobUrl(): Promise<string | null> {
-    if (blobUrl) return blobUrl;
-    try {
-        const { blobs } = await list({ prefix: DATA_PATHNAME, limit: 10 });
-        blobUrl =
-            blobs.find((b) => b.pathname === DATA_PATHNAME)?.url ??
-            blobs[0]?.url ??
-            null;
-        return blobUrl;
-    } catch {
-        // No BLOB_READ_WRITE_TOKEN (local dev, or before Blob is set up).
-        // Callers fall back to the bundled seed rather than crashing.
-        return null;
+type Row = Record<string, unknown>;
+
+const KNOWN = new Set(["id", "slug", "title", "kind", "glyph", "href", "domain", "year", "featured", "span", "cover", "images", "technologies", "i18n"]);
+
+function fromRow(row: Row): Project {
+    const project: Record<string, unknown> = {
+        id: row.id,
+        slug: row.slug,
+        title: row.title,
+        kind: row.kind,
+        glyph: row.glyph,
+        images: row.images ?? [],
+        technologies: row.technologies ?? [],
+        featured: row.featured,
+        span: row.span,
+        i18n: row.i18n ?? {},
+    };
+    for (const key of ["cover", "href", "domain", "year"]) {
+        if (row[key] !== null && row[key] !== undefined) project[key] = row[key];
     }
+    if (row.extra && typeof row.extra === "object") Object.assign(project, row.extra);
+    return project as unknown as Project;
 }
+
+function toParams(project: Project): unknown[] {
+    const p = project as unknown as Row;
+    const extra: Row = {};
+    for (const [k, v] of Object.entries(p)) if (!KNOWN.has(k) && v !== undefined) extra[k] = v;
+    return [
+        project.id,
+        project.slug,
+        project.title,
+        project.kind,
+        project.glyph,
+        project.href ?? null,
+        project.domain ?? null,
+        project.year ?? null,
+        Boolean(project.featured),
+        project.span ?? "half",
+        project.cover ? JSON.stringify(project.cover) : null,
+        JSON.stringify(project.images ?? []),
+        JSON.stringify(project.technologies ?? []),
+        JSON.stringify(project.i18n ?? {}),
+        Object.keys(extra).length ? JSON.stringify(extra) : null,
+    ];
+}
+
+const UPSERT = `insert into portfolio_projects
+    (id, slug, title, kind, glyph, href, domain, year, featured, span, cover, images, technologies, i18n, extra)
+  values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13::jsonb, $14::jsonb, $15::jsonb)
+  on conflict (id) do update set
+    slug = excluded.slug, title = excluded.title, kind = excluded.kind, glyph = excluded.glyph,
+    href = excluded.href, domain = excluded.domain, year = excluded.year, featured = excluded.featured,
+    span = excluded.span, cover = excluded.cover, images = excluded.images,
+    technologies = excluded.technologies, i18n = excluded.i18n, extra = excluded.extra`;
 
 /** One trip to storage, no memo involved. */
 async function load(): Promise<Project[]> {
-    const url = await findDataBlobUrl();
-
-    // First run: nothing in Blob yet, fall back to the seed bundled in the
-    // repo so the site isn't empty before the first admin save.
-    if (!url) return seedProjects.projects;
+    if (!hasDatabase()) return seedProjects.projects;
 
     try {
-        const res = await fetch(`${url}?t=${Date.now()}`, { cache: "no-store" });
-        if (!res.ok) {
-            blobUrl = null;
-            return seedProjects.projects;
-        }
-
-        const parsed = (await res.json()) as ProjectsFile;
-        return parsed.projects ?? seedProjects.projects;
+        await ensureSchema();
+        const { rows } = await getPool().query("select * from portfolio_projects order by id");
+        // First run: nothing saved yet, show the seed so the site isn't empty.
+        return rows.length ? rows.map(fromRow) : seedProjects.projects;
     } catch {
         return seedProjects.projects;
     }
@@ -97,40 +121,51 @@ export async function readProjects(
 
 export class ProjectsStoreError extends Error {}
 
-export async function writeProjects(projects: Project[]): Promise<void> {
-    const payload: ProjectsFile = { projects };
-    memo = null;
+const LOCK_ID = 7302;
 
-    try {
-        const result = await put(DATA_PATHNAME, JSON.stringify(payload, null, 2), {
-            access: "public",
-            addRandomSuffix: false,
-            allowOverwrite: true,
-            contentType: "application/json",
-            // Overwritten in place, so an edge copy of the old version would
-            // keep the site showing yesterday's portfolio.
-            cacheControlMaxAge: 0,
-        });
-        blobUrl = result.url;
-        memo = { projects, at: Date.now() };
-    } catch (cause) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-
-        if (/private store|public access/i.test(message)) {
-            throw new ProjectsStoreError(
-                "Хранилище Vercel Blob создано с приватным доступом, а сайту " +
-                "нужен публичный: и данные проектов, и картинки читаются из " +
-                "браузера. Переключите store на public access (или создайте " +
-                "публичный) и повторите сохранение.",
-            );
-        }
-        if (/token/i.test(message)) {
-            throw new ProjectsStoreError(
-                "Нет доступа к Vercel Blob — проверьте BLOB_READ_WRITE_TOKEN.",
-            );
-        }
-        throw new ProjectsStoreError(`Не удалось сохранить в Vercel Blob: ${message}`);
+/** Run `work` in a transaction that holds the portfolio lock. */
+async function withLock<T>(work: (q: { query: (t: string, p?: unknown[]) => Promise<{ rows: Row[] }> }) => Promise<T>): Promise<T> {
+    if (!hasDatabase()) {
+        throw new ProjectsStoreError("Не задан DATABASE_URL — сохранить проект некуда.");
     }
+    memo = null;
+    try {
+        await ensureSchema();
+        const client = await getPool().connect();
+        try {
+            await client.query("begin");
+            await client.query("select pg_advisory_xact_lock($1)", [LOCK_ID]);
+            const result = await work(client);
+            await client.query("commit");
+            return result;
+        } catch (error) {
+            await client.query("rollback").catch(() => undefined);
+            throw error;
+        } finally {
+            client.release();
+        }
+    } catch (cause) {
+        if (cause instanceof ProjectsStoreError) throw cause;
+        const message = cause instanceof Error ? cause.message : String(cause);
+        throw new ProjectsStoreError(`Не удалось сохранить в базу: ${message}`);
+    }
+}
+
+/** First save into an empty table: put the seed there too, or the site would lose it. */
+async function seedIfEmpty(q: { query: (t: string, p?: unknown[]) => Promise<{ rows: Row[] }> }) {
+    const { rows } = await q.query("select count(*)::int as n from portfolio_projects");
+    if (Number(rows[0]?.n) > 0) return;
+    for (const project of seedProjects.projects) await q.query(UPSERT, toParams(project));
+}
+
+/** Replace the whole list — used by the one-off import. */
+export async function writeProjects(projects: Project[]): Promise<void> {
+    await withLock(async (q) => {
+        for (const project of projects) await q.query(UPSERT, toParams(project));
+        const ids = projects.map((p) => p.id);
+        await q.query("delete from portfolio_projects where not (id = any($1))", [ids]);
+    });
+    memo = null;
 }
 
 export async function getProjectBySlug(slug: string) {
@@ -148,29 +183,31 @@ export function slugify(input: string) {
 }
 
 export async function upsertProject(project: Project) {
-    // Always against the stored file — writing on top of a memoised copy would
-    // drop whatever was saved in between.
-    const projects = await readProjects({ fresh: true });
-    const idx = projects.findIndex((p) => p.slug === project.slug);
-
-    if (idx === -1) {
-        const nextId = projects.length
-            ? Math.max(...projects.map((p) => p.id)) + 1
-            : 1;
-        projects.push({ ...project, id: nextId });
-    } else {
-        projects[idx] = { ...projects[idx], ...project, id: projects[idx].id };
-    }
-
-    await writeProjects(projects);
+    await withLock(async (q) => {
+        await seedIfEmpty(q);
+        // A rename arrives as the same id under a new slug — it must stay the same project.
+        const { rows } = await q.query(
+            "select * from portfolio_projects where slug = $1 or id = $2 order by (slug = $1) desc limit 1",
+            [project.slug, Number.isInteger(project.id) && project.id > 0 ? project.id : -1],
+        );
+        if (rows.length) {
+            const current = fromRow(rows[0]);
+            await q.query(UPSERT, toParams({ ...current, ...project, id: current.id }));
+        } else {
+            const next = await q.query("select coalesce(max(id), 0) + 1 as id from portfolio_projects");
+            await q.query(UPSERT, toParams({ ...project, id: Number(next.rows[0].id) }));
+        }
+    });
+    memo = null;
     return project;
 }
 
 export async function deleteProjectBySlug(slug: string) {
-    const projects = await readProjects({ fresh: true });
-    const next = projects.filter((p) => p.slug !== slug);
-    if (next.length === projects.length) return false;
-
-    await writeProjects(next);
-    return true;
+    const removed = await withLock(async (q) => {
+        await seedIfEmpty(q);
+        const { rows } = await q.query("delete from portfolio_projects where slug = $1 returning id", [slug]);
+        return rows.length > 0;
+    });
+    memo = null;
+    return removed;
 }
