@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { PIPELINE_STAGES, pipelineColumn, type Lead, type LeadStage } from "@/types/crm";
 import { cn } from "@/lib/utils";
@@ -23,18 +23,40 @@ export function PipelineBoard({
   leads: Lead[];
   showMoney: boolean;
 }) {
-  const [pending, startTransition] = useTransition();
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<LeadStage | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(0);
 
-  // Move the card the moment it is dropped; the server write follows.
-  const [items, moveCard] = useOptimistic(
-    leads,
-    (state: Lead[], change: { id: string; stage: LeadStage }) =>
-      state.map((lead) =>
-        lead.id === change.id ? { ...lead, stage: change.stage } : lead,
-      ),
+  /*
+    Where a card was dropped, kept until the server's own data agrees.
+
+    `useOptimistic` forgets the move the moment the action returns, and the
+    page that follows can still be rendered from an older copy of the CRM (a
+    different serverless instance, a memoised read) — the card then jumped
+    back as if the drop had not worked. An override stays until the data
+    coming from the server shows the same stage, or the save fails.
+  */
+  const [moved, setMoved] = useState<Record<string, LeadStage>>({});
+
+  useEffect(() => {
+    setMoved((current) => {
+      let changed = false;
+      const next: Record<string, LeadStage> = {};
+      for (const [id, stage] of Object.entries(current)) {
+        const lead = leads.find((l) => l.id === id);
+        if (lead && lead.stage !== stage) next[id] = stage;
+        else changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [leads]);
+
+  const items = useMemo(
+    () => leads.map((lead) => (moved[lead.id] ? { ...lead, stage: moved[lead.id] } : lead)),
+    [leads, moved],
   );
+  const pending = saving > 0;
 
   const scroller = useRef<HTMLDivElement>(null);
 
@@ -57,13 +79,38 @@ export function PipelineBoard({
     const lead = items.find((l) => l.id === id);
     if (!lead || lead.stage === stage) return;
 
-    startTransition(async () => {
-      moveCard({ id, stage });
-      await setLeadStageAction(id, stage);
-    });
+    const previous = lead.stage;
+    setError(null);
+    setMoved((m) => ({ ...m, [id]: stage }));
+    setSaving((n) => n + 1);
+
+    void setLeadStageAction(id, stage)
+      .then((result) => {
+        if (!result.ok) throw new Error(result.error);
+      })
+      .catch((cause: unknown) => {
+        // Put the card back and say why — a silent snap-back looks like a broken drop.
+        setMoved((m) => {
+          const { [id]: _drop, ...rest } = m;
+          void _drop;
+          return rest;
+        });
+        setError(
+          `Не удалось перенести карточку (${STAGE_LABEL[previous] ?? previous} → ${STAGE_LABEL[stage] ?? stage}): ${
+            cause instanceof Error ? cause.message : "ошибка сохранения"
+          }`,
+        );
+      })
+      .finally(() => setSaving((n) => n - 1));
   }
 
   return (
+    <>
+    {error ? (
+      <p role="alert" className="mb-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+        {error}
+      </p>
+    ) : null}
     <div
       ref={scroller}
       className={cn(
@@ -176,5 +223,6 @@ export function PipelineBoard({
         })}
       </div>
     </div>
+    </>
   );
 }
