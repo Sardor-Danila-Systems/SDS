@@ -2,7 +2,7 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { emptyCrmData, type CrmData } from "@/types/crm";
-import { getPool, hasDatabase } from "@/lib/db";
+import { getPool, getSql, hasDatabase, isMissingTable } from "@/lib/db";
 import { SCHEMA_SQL, SETTINGS_TABLE, TABLES, columns, fromRow, toValues, type TableSpec } from "./schema";
 
 /*
@@ -99,11 +99,22 @@ type Snapshot = Map<string, Map<string, string>>;
 
 const rowKey = (spec: TableSpec, entity: Record<string, unknown>) => JSON.stringify(toValues(spec, entity));
 
-async function loadFrom(q: Queryable): Promise<{ data: CrmData; snapshot: Snapshot }> {
-  const [settings, ...tables] = await Promise.all([
-    q.query(`select key, value from ${SETTINGS_TABLE}`),
-    ...TABLES.map((spec) => q.query(`select * from ${spec.table} order by seq`)),
-  ]);
+const SELECTS = [`select key, value from ${SETTINGS_TABLE}`, ...TABLES.map((spec) => `select * from ${spec.table} order by seq`)];
+
+/** Everything in one HTTP request — what a plain read uses. */
+async function fetchAllHttp(): Promise<Record<string, unknown>[][]> {
+  const sql = getSql();
+  return (await sql.transaction((t) => SELECTS.map((text) => t.query(text)))) as Record<string, unknown>[][];
+}
+
+async function fetchAllOn(q: Queryable): Promise<Record<string, unknown>[][]> {
+  return (await Promise.all(SELECTS.map((text) => q.query(text)))).map((r) => r.rows);
+}
+
+async function loadFrom(fetchAll: () => Promise<Record<string, unknown>[][]>): Promise<{ data: CrmData; snapshot: Snapshot }> {
+  const [settingsRows, ...tableRows] = await fetchAll();
+  const settings = { rows: settingsRows };
+  const tables = tableRows.map((rows) => ({ rows }));
 
   const data = { ...emptyCrmData } as unknown as Record<string, unknown>;
   const snapshot: Snapshot = new Map();
@@ -173,7 +184,7 @@ export async function importCrm(data: CrmData): Promise<void> {
   try {
     await client.query("begin");
     await client.query("select pg_advisory_xact_lock($1)", [LOCK_ID]);
-    const { snapshot } = await loadFrom(client);
+    const { snapshot } = await loadFrom(() => fetchAllOn(client));
     await saveTo(client, { ...emptyCrmData, ...data }, snapshot);
     await client.query("commit");
   } catch (error) {
@@ -215,8 +226,14 @@ export async function readCrm(): Promise<CrmData> {
   }
 
   try {
-    await ensureSchema();
-    return (await loadFrom(getPool())).data;
+    // The schema is only created when a read finds it missing — not on every cold start.
+    try {
+      return (await loadFrom(fetchAllHttp)).data;
+    } catch (error) {
+      if (!isMissingTable(error)) throw error;
+      await ensureSchema();
+      return (await loadFrom(fetchAllHttp)).data;
+    }
   } catch {
     // A failed read is never memoised — an empty document is a symptom, not
     // an answer, and the next attempt should try storage again.
@@ -236,6 +253,7 @@ let fileQueue: Promise<unknown> = Promise.resolve();
 
 export async function mutateCrm<T>(
   change: (data: CrmData) => T | Promise<T>,
+  retried = false,
 ): Promise<T> {
   if (driver() === "file") {
     const run = async () => {
@@ -250,12 +268,13 @@ export async function mutateCrm<T>(
     return result;
   }
 
-  await ensureSchema();
+  let released = false;
   const client = await getPool().connect();
   try {
     await client.query("begin");
     await client.query("select pg_advisory_xact_lock($1)", [LOCK_ID]);
-    const { data, snapshot } = await loadFrom(client);
+    const loaded = await loadFrom(() => fetchAllOn(client));
+    const { data, snapshot } = loaded;
     const result = await change(data);
     await saveTo(client, data, snapshot);
     await client.query("commit");
@@ -263,6 +282,13 @@ export async function mutateCrm<T>(
     return result;
   } catch (cause) {
     await client.query("rollback").catch(() => undefined);
+    // First use of an empty database: create the tables, then run the change again.
+    if (isMissingTable(cause) && !retried) {
+      client.release();
+      released = true;
+      await ensureSchema();
+      return mutateCrm(change, true);
+    }
     // A refusal from the application ("lead not found") is not a storage fault.
     if (cause instanceof Error && cause.name === "DatabaseError") {
       const message = cause.message;
@@ -271,6 +297,6 @@ export async function mutateCrm<T>(
     }
     throw cause;
   } finally {
-    client.release();
+    if (!released) client.release();
   }
 }

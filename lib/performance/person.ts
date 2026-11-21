@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { requirePermission } from "@/lib/crm/repo";
 import { type JiraHistory, type Period, getJson, jiraDoer, mapLimit, personMap } from "@/lib/performance";
 
@@ -378,8 +379,7 @@ async function loadJira(is: (v?: string | null) => boolean, sinceDate: string, s
 
 /* --------------------------------- public --------------------------------- */
 
-export async function buildPersonDetail(name: string, period: Period): Promise<PersonDetail> {
-  await requirePermission("team.view");
+async function computePersonDetail(name: string, period: Period): Promise<PersonDetail> {
 
   const since = new Date(Date.now() - period * 86_400_000).toISOString();
   const { is } = identitiesOf(name);
@@ -424,4 +424,12 @@ export async function buildPersonDetail(name: string, period: Period): Promise<P
       hoursLogged: Math.round(tasks.reduce((a, t) => a + t.hoursLogged, 0) * 10) / 10,
     },
   };
+}
+
+/** Same idea as the overview: expensive to build, so shared for five minutes. */
+const cachedPersonDetail = unstable_cache(computePersonDetail, ["performance-person"], { revalidate: 300 });
+
+export async function buildPersonDetail(name: string, period: Period): Promise<PersonDetail> {
+  await requirePermission("team.view");
+  return cachedPersonDetail(name, period);
 }

@@ -1,6 +1,6 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
-import { getPool, hasDatabase } from "@/lib/db";
+import { getPool, hasDatabase, isMissingTable } from "@/lib/db";
 import { ensureSchema } from "@/lib/crm/store";
 
 /*
@@ -25,8 +25,13 @@ export async function saveMedia(input: { name: string; contentType: string; data
 
 export async function readMedia(id: string): Promise<{ contentType: string; data: Buffer } | null> {
   if (!hasDatabase() || !/^[0-9a-f-]{36}$/.test(id)) return null;
-  await ensureSchema();
-  const { rows } = await getPool().query("select content_type, data from media where id = $1", [id]);
+  let rows: Record<string, unknown>[];
+  try {
+    ({ rows } = await getPool().query("select content_type, data from media where id = $1", [id]));
+  } catch (error) {
+    if (isMissingTable(error)) return null;
+    throw error;
+  }
   if (!rows.length) return null;
   return { contentType: String(rows[0].content_type), data: rows[0].data as Buffer };
 }

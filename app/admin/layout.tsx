@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { Onest, JetBrains_Mono } from "next/font/google";
 import { getSessionUser } from "@/lib/auth";
@@ -38,6 +39,19 @@ export const metadata = {
     robots: { index: false, follow: false },
 };
 
+/**
+ * The bell is derived from the records, so it can't disagree with the data —
+ * but it must not hold the page back either: the menu and the screen render
+ * first, the bell fills in when its read finishes.
+ */
+async function NotificationsSlot() {
+    return <Notifications items={await listNotifications()} />;
+}
+
+function BellPlaceholder() {
+    return <span aria-hidden="true" className="inline-block size-9" />;
+}
+
 export default async function AdminLayout({
     children,
 }: {
@@ -45,8 +59,6 @@ export default async function AdminLayout({
 }) {
     // Null on the login page, which renders without the shell.
     const user = await getSessionUser();
-    // Derived from the records, so the bell can't disagree with the data.
-    const notifications = user ? await listNotifications() : [];
 
     return (
         <html
@@ -64,12 +76,14 @@ export default async function AdminLayout({
                         <AdminNav
                             role={user.role}
                             userName={user.name}
-                            mobileActions={<Notifications items={notifications} />}
+                            mobileActions={<Suspense fallback={<BellPlaceholder />}><NotificationsSlot /></Suspense>}
                         />
                         <div className="min-w-0 flex-1">
                             <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border bg-background/80 px-8 backdrop-blur-xl lg:flex">
                                 <GlobalSearch />
-                                <Notifications items={notifications} />
+                                <Suspense fallback={<BellPlaceholder />}>
+                                    <NotificationsSlot />
+                                </Suspense>
                                 <Link
                                     href="/"
                                     target="_blank"

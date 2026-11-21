@@ -1,4 +1,5 @@
 import "server-only";
+import { unstable_cache } from "next/cache";
 import { requirePermission } from "@/lib/crm/repo";
 
 /*
@@ -393,8 +394,7 @@ async function loadJira(sinceDate: string, since: string): Promise<JiraResult> {
 
 /* ---------------------------------- public -------------------------------- */
 
-export async function buildPerformance(period: Period): Promise<PerformanceData> {
-  await requirePermission("team.view");
+async function computePerformance(period: Period): Promise<PerformanceData> {
 
   const sinceMs = Date.now() - period * 86_400_000;
   const since = new Date(sinceMs).toISOString();
@@ -493,4 +493,16 @@ export async function buildPerformance(period: Period): Promise<PerformanceData>
     daily,
     generatedAt: new Date().toISOString(),
   };
+}
+
+/*
+  Building this means dozens of GitHub and Jira requests, so the finished
+  result is kept for five minutes and shared by every request. After that the
+  old copy is served at once while a new one is built in the background.
+*/
+const cachedPerformance = unstable_cache(computePerformance, ["performance"], { revalidate: 300 });
+
+export async function buildPerformance(period: Period): Promise<PerformanceData> {
+  await requirePermission("team.view");
+  return cachedPerformance(period);
 }

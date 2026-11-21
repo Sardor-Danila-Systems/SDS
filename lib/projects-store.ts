@@ -1,7 +1,7 @@
 import { cache } from "react";
 import type { Project } from "@/types/project";
 import seedProjectsJson from "@/data/projects-seed.json";
-import { getPool, hasDatabase } from "@/lib/db";
+import { getPool, getSql, hasDatabase, isMissingTable } from "@/lib/db";
 import { ensureSchema } from "@/lib/crm/store";
 
 /*
@@ -91,8 +91,15 @@ async function load(): Promise<Project[]> {
     if (!hasDatabase()) return seedProjects.projects;
 
     try {
-        await ensureSchema();
-        const { rows } = await getPool().query("select * from portfolio_projects order by id");
+        const read = () => getSql().query("select * from portfolio_projects order by id") as Promise<Row[]>;
+        let rows: Row[];
+        try {
+            rows = await read();
+        } catch (error) {
+            if (!isMissingTable(error)) throw error;
+            await ensureSchema();
+            rows = await read();
+        }
         // First run: nothing saved yet, show the seed so the site isn't empty.
         return rows.length ? rows.map(fromRow) : seedProjects.projects;
     } catch {
