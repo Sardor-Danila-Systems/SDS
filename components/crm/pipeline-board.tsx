@@ -1,6 +1,6 @@
 "use client";
 
-import { useOptimistic, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { PIPELINE_STAGES, pipelineColumn, type Lead, type LeadStage } from "@/types/crm";
 import { cn } from "@/lib/utils";
@@ -36,6 +36,18 @@ export function PipelineBoard({
       ),
   );
 
+  const scroller = useRef<HTMLDivElement>(null);
+
+  /** The board is wider than the screen: nudge it sideways while a card is held near an edge. */
+  function autoScroll(clientX: number) {
+    const el = scroller.current;
+    if (!el) return;
+    const { left, right } = el.getBoundingClientRect();
+    const zone = 90;
+    if (clientX < left + zone) el.scrollLeft -= Math.ceil((left + zone - clientX) / 4);
+    else if (clientX > right - zone) el.scrollLeft += Math.ceil((clientX - (right - zone)) / 4);
+  }
+
   function drop(stage: LeadStage) {
     const id = dragging;
     setDragging(null);
@@ -53,6 +65,7 @@ export function PipelineBoard({
 
   return (
     <div
+      ref={scroller}
       className={cn(
         "-mx-4 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8",
         pending && "opacity-80",
@@ -72,10 +85,20 @@ export function PipelineBoard({
               key={stage}
               onDragOver={(event) => {
                 event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
                 setOver(stage);
+                autoScroll(event.clientX);
               }}
-              onDragLeave={() => setOver((s) => (s === stage ? null : s))}
-              onDrop={() => drop(stage)}
+              // dragleave also fires when the pointer moves onto a child of the column — ignore that.
+              onDragLeave={(event) => {
+                if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                setOver((s) => (s === stage ? null : s));
+              }}
+              onDrop={(event) => {
+                // Without this the browser may open the dragged card's link instead of dropping it.
+                event.preventDefault();
+                drop(stage);
+              }}
               className={cn(
                 "w-72 shrink-0 rounded-xl border p-3 transition-colors",
                 over === stage
@@ -99,14 +122,19 @@ export function PipelineBoard({
                   <li key={lead.id}>
                     <div
                       draggable
-                      onDragStart={() => setDragging(lead.id)}
+                      onDragStart={(event) => {
+                        // Firefox starts no drag without data; the effect keeps the cursor honest.
+                        event.dataTransfer.setData("text/plain", lead.id);
+                        event.dataTransfer.effectAllowed = "move";
+                        setDragging(lead.id);
+                      }}
                       onDragEnd={() => setDragging(null)}
                       className={cn(
                         "cursor-grab rounded-lg border border-border bg-card p-3 shadow-[var(--shadow-panel)] transition-colors hover:border-border-strong active:cursor-grabbing",
                         dragging === lead.id && "opacity-40",
                       )}
                     >
-                      <Link href={`/admin/crm/leads/${lead.id}`} className="block">
+                      <Link href={`/admin/crm/leads/${lead.id}`} draggable={false} className="block">
                         <p className="text-sm font-medium leading-snug">
                           {lead.company ??
                             `${lead.firstName} ${lead.lastName ?? ""}`.trim()}
