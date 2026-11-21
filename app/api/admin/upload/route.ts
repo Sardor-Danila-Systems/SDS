@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { put } from "@vercel/blob";
 import { canEditContent } from "@/lib/auth";
+import { MediaError, saveMedia } from "@/lib/media";
 
 /**
  * Image upload for the project form. Takes multipart `file`, returns
- * `{ src }` — the public Blob URL the form stores on the project.
+ * `{ src }` — the `/api/media/<id>` address the form stores on the project.
  */
 
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -13,13 +13,6 @@ const ALLOWED = ["image/png", "image/jpeg", "image/webp", "image/avif"];
 export async function POST(request: Request) {
   if (!(await canEditContent())) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
-    return NextResponse.json(
-      { error: "Загрузка не настроена: нет BLOB_READ_WRITE_TOKEN." },
-      { status: 500 },
-    );
   }
 
   let file: File | null = null;
@@ -50,24 +43,17 @@ export async function POST(request: Request) {
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").toLowerCase();
 
   try {
-    const blob = await put(`work/${safeName}`, file, {
-      access: "public",
-      addRandomSuffix: true,
+    const src = await saveMedia({
+      name: safeName,
       contentType: file.type,
+      data: Buffer.from(await file.arrayBuffer()),
     });
-    return NextResponse.json({ src: blob.url });
+    return NextResponse.json({ src });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (/private store|public access/i.test(message)) {
-      return NextResponse.json(
-        {
-          error:
-            "Хранилище Vercel Blob приватное, а картинки должны открываться " +
-            "из браузера. Переключите store на public access.",
-        },
-        { status: 502 },
-      );
-    }
-    return NextResponse.json({ error: `Загрузка не удалась: ${message}` }, { status: 502 });
+    return NextResponse.json(
+      { error: error instanceof MediaError ? message : `Загрузка не удалась: ${message}` },
+      { status: 502 },
+    );
   }
 }

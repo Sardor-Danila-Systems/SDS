@@ -36,8 +36,8 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.join(__dirname),
   images: {
     formats: ["image/avif", "image/webp"],
-    // Covers uploaded through /admin are served from Vercel Blob, so
-    // next/image has to be told the host is allowed.
+    // Pictures uploaded through /admin are served from /api/media (Neon). The
+    // Blob host stays allowed only for old links not yet moved by the import.
     remotePatterns: [
       { protocol: "https", hostname: "*.public.blob.vercel-storage.com" },
     ],

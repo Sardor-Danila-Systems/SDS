@@ -11,10 +11,10 @@
 
 ### 1.1. База данных — Neon Postgres
 
-CRM и портфолио лежат в Neon (проект `sds`, регион Frankfurt, в организации
-Сардора). Таблицы создаются сами при первом обращении (`crm_*` и
-`portfolio_projects`, схема в `lib/crm/schema.ts`). Картинки остаются в Vercel
-Blob (`BLOB_READ_WRITE_TOKEN`), в базе только их адреса.
+Всё хранится в Neon (проект `sds`, регион Frankfurt, в организации Сардора):
+CRM, портфолио и загруженные картинки. Vercel Blob больше не используется.
+Таблицы создаются сами при первом обращении (`crm_*`, `portfolio_projects`,
+`media`, схема в `lib/crm/schema.ts`). Картинки отдаёт `/api/media/<id>`.
 
 Сохранение CRM идёт в транзакции с блокировкой: два одновременных сохранения
 (в том числе с разных инстансов Vercel) выстраиваются в очередь и не затирают
@@ -23,15 +23,16 @@ Blob (`BLOB_READ_WRITE_TOKEN`), в базе только их адреса.
 Без `DATABASE_URL` CRM пишется в локальный `.data/crm.json` (для разработки), на
 дашборде висит предупреждение.
 
-Перенос из Blob (разово): `CRM_BLOB_READ_WRITE_TOKEN`, `BLOB_READ_WRITE_TOKEN` и
-`DATABASE_URL` в `.env.local`, затем
+Перенос из Blob (разово, `@vercel/blob` нужен только для него):
+`CRM_BLOB_READ_WRITE_TOKEN`, `BLOB_READ_WRITE_TOKEN` и `DATABASE_URL` в
+`.env.local`, затем
 
 ```bash
 node --env-file=.env.local --conditions react-server --import tsx scripts/migrate-blob-to-neon.ts --dry-run
 node --env-file=.env.local --conditions react-server --import tsx scripts/migrate-blob-to-neon.ts
 ```
 
-Скрипт только читает Blob, не пишет в непустую базу без `--force` и сверяет
+Скрипт только читает Blob, копирует картинки портфолио в таблицу `media`, не пишет в непустую базу без `--force` и сверяет
 количество записей после переноса.
 
 ### 1.2. Убрать `.env` из гита 🔐
@@ -57,7 +58,7 @@ git commit -m "chore: stop tracking .env"
 | `ADMIN_LOGIN` | Логин админа «на всякий случай» — им нельзя заблокировать себе вход | да |
 | `ADMIN_PASSWORD` | Пароль к нему | да |
 | `ADMIN_SESSION_SECRET` | Подпись JWT сессии. Длинная случайная строка | да |
-| `BLOB_READ_WRITE_TOKEN` | Публичный стор Blob: картинки портфолио | для прода |
+| `BLOB_READ_WRITE_TOKEN` | Только для разового переноса из Blob, после него не нужен | нет |
 | `DATABASE_URL` | Neon Postgres, pooled-строка подключения (см. 1.1) | для прода |
 | `JARVIS_API_KEY_SHA256` | SHA-256 ключа Jarvis (сам ключ хранится только у Jarvis), см. «Jarvis» ниже | для Jarvis |
 | `JARVIS_ROLE` | Роль аккаунта Jarvis при его создании: `ADMIN`, `SALES` или `DEVELOPER` (по умолчанию `SALES`) | нет |

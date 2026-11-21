@@ -157,6 +157,14 @@ export const SCHEMA_SQL: string[] = [
       (cols) => `create index if not exists ${spec.table}_${cols.map((c) => snake(c)).join("_")}_idx on ${spec.table} (${cols.map((c) => snake(c)).join(", ")})`,
     ),
   ]),
+  `create table if not exists media (
+    id text primary key,
+    name text not null,
+    content_type text not null,
+    size integer not null,
+    data bytea not null,
+    created_at timestamptz not null default now()
+  )`,
   `create table if not exists portfolio_projects (
     id integer primary key,
     slug text not null unique,

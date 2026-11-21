@@ -5,7 +5,7 @@
 
   Needs DATABASE_URL, CRM_BLOB_READ_WRITE_TOKEN (private store, the CRM) and
   BLOB_READ_WRITE_TOKEN (public store, the portfolio). Blob is only read, never
-  changed. The import is idempotent — running it twice gives the same result —
+  changed; the portfolio pictures are copied into the `media` table. The import is idempotent — running it twice gives the same result —
   and it refuses to overwrite a non-empty database unless --force is given.
 */
 import { get, list } from "@vercel/blob";
@@ -13,6 +13,7 @@ import { emptyCrmData, type CrmData } from "../types/crm";
 import type { Project } from "../types/project";
 import { importCrm, readCrm } from "../lib/crm/store";
 import { readProjects, writeProjects } from "../lib/projects-store";
+import { saveMedia } from "../lib/media";
 
 const DATA = "data/crm.json";
 const PORTFOLIO = "data/projects.json";
@@ -48,6 +49,33 @@ async function readPortfolioFromBlob(): Promise<Project[] | null> {
   return ((await res.json()) as { projects: Project[] }).projects;
 }
 
+const isBlobUrl = (src: unknown): src is string => typeof src === "string" && /\.blob\.vercel-storage\.com\//.test(src);
+
+/** Every picture of the portfolio that still points at Blob. */
+function blobImages(projects: Project[]) {
+  const urls = new Set<string>();
+  for (const p of projects) {
+    if (isBlobUrl(p.cover?.src)) urls.add(p.cover.src);
+    for (const img of p.images ?? []) if (isBlobUrl(img.src)) urls.add(img.src);
+  }
+  return urls;
+}
+
+/** Copy those pictures into the database and point the projects at the copies. */
+async function moveImages(projects: Project[]) {
+  const moved = new Map<string, string>();
+  for (const url of blobImages(projects)) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`картинка ${url}: ${res.status}`);
+    const contentType = res.headers.get("content-type") ?? "image/jpeg";
+    const name = decodeURIComponent(new URL(url).pathname.split("/").pop() ?? "image");
+    moved.set(url, await saveMedia({ name, contentType, data: Buffer.from(await res.arrayBuffer()) }));
+  }
+  const swap = <T extends { src: string }>(img: T): T => (moved.has(img.src) ? { ...img, src: moved.get(img.src)! } : img);
+  const next = projects.map((p) => ({ ...p, cover: p.cover ? swap(p.cover) : p.cover, images: (p.images ?? []).map(swap) }));
+  return { projects: next, count: moved.size };
+}
+
 async function main() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL не задан");
 
@@ -59,6 +87,7 @@ async function main() {
     Object.fromEntries(Object.entries(d).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as unknown[]).length]));
   console.log("Blob → CRM:", counts({ ...emptyCrmData, ...crm }));
   console.log("Blob → портфолио:", portfolio ? portfolio.length : "нет файла");
+  if (portfolio) console.log("Blob → картинок к переносу:", blobImages(portfolio).size);
   if (dry) return console.log("--dry-run: в базу ничего не записано");
 
   const existing = await readCrm();
@@ -66,7 +95,11 @@ async function main() {
   if (filled && !force) throw new Error("В Neon уже есть данные CRM. Если это точно нужно перезаписать — запустите с --force.");
 
   await importCrm(crm);
-  if (portfolio) await writeProjects(portfolio);
+  if (portfolio) {
+    const { projects: moved, count } = await moveImages(portfolio);
+    await writeProjects(moved);
+    console.log("Картинок перенесено в Neon:", count);
+  }
 
   const after = await readCrm();
   const same = JSON.stringify(counts(after)) === JSON.stringify(counts({ ...emptyCrmData, ...crm }));
