@@ -5,6 +5,7 @@ import { getSessionUser } from "@/lib/auth";
 import { AdminNav } from "@/components/admin/admin-nav";
 import { GlobalSearch } from "@/components/crm/global-search";
 import { Notifications } from "@/components/crm/notifications";
+import { AdminTour, TourButton } from "@/components/admin/admin-tour";
 import { listNotifications } from "@/lib/crm/repo";
 import { ArrowUpRight } from "lucide-react";
 import { THEME_INIT_SCRIPT } from "@/components/admin/theme-toggle";
@@ -81,6 +82,7 @@ export default async function AdminLayout({
                         <div className="min-w-0 flex-1">
                             <header className="sticky top-0 z-30 hidden h-14 items-center justify-end gap-3 border-b border-border bg-background/80 px-8 backdrop-blur-xl lg:flex">
                                 <GlobalSearch />
+                                <TourButton />
                                 <Suspense fallback={<BellPlaceholder />}>
                                     <NotificationsSlot />
                                 </Suspense>
@@ -92,6 +94,7 @@ export default async function AdminLayout({
                                     Сайт <ArrowUpRight className="size-3.5" />
                                 </Link>
                             </header>
+                            <AdminTour userId={user.id} />
                             <main className="mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
                                 {children}
                             </main>

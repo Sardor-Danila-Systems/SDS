@@ -189,6 +189,7 @@ export function AdminNav({
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    data-tour={`nav-${item.href.split("/").filter(Boolean).slice(1).pop() ?? "home"}`}
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
                     className={cn(
