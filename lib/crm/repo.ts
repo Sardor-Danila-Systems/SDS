@@ -25,6 +25,11 @@ import type {
   CrmData,
   EntityType,
   Expense,
+  Idea,
+  IdeaCategory,
+  IdeaLevel,
+  IdeaStatus,
+  IdeaStep,
   ExpenseCategory,
   Lead,
   ProjectExecutor,
@@ -1508,4 +1513,157 @@ export async function setUserPassword(userId: string, next: string) {
     });
     return user;
   });
+}
+
+
+/* ---------------------------------- ideas --------------------------------- */
+
+export async function listIdeas(): Promise<Idea[]> {
+  const { ideas } = await getCrm();
+  return alive(ideas ?? []).sort(
+    (a, b) => Number(Boolean(b.favorite)) - Number(Boolean(a.favorite)) || b.createdAt.localeCompare(a.createdAt),
+  );
+}
+
+export interface IdeaInput {
+  title: string;
+  description?: string;
+  category?: IdeaCategory;
+  effort?: IdeaLevel;
+  impact?: IdeaLevel;
+  steps?: string[];
+  source?: Idea["source"];
+}
+
+const newIdea = (input: IdeaInput, actor: SessionUser): Idea => ({
+  id: id(),
+  title: input.title.trim().slice(0, 140),
+  description: (input.description ?? "").trim().slice(0, 2000),
+  category: input.category ?? "SALES",
+  effort: input.effort ?? "MEDIUM",
+  impact: input.impact ?? "MEDIUM",
+  status: "NEW",
+  source: input.source ?? "manual",
+  steps: (input.steps ?? [])
+    .map((text) => text.trim())
+    .filter(Boolean)
+    .slice(0, 12)
+    .map((text): IdeaStep => ({ id: id(), text: text.slice(0, 200), done: false })),
+  createdById: actor.id,
+  createdByName: actor.name,
+  createdAt: now(),
+  updatedAt: now(),
+});
+
+/** Add one or several ideas at once (the generator saves a batch in one write). */
+export async function createIdeas(inputs: IdeaInput[]): Promise<Idea[]> {
+  const actor = await requirePermission("idea.write");
+  const clean = inputs.filter((i) => i.title?.trim());
+  if (!clean.length) throw new Error("Назовите идею.");
+
+  return mutateCrm((data) => {
+    data.ideas ??= [];
+    const created = clean.map((input) => newIdea(input, actor));
+    data.ideas.push(...created);
+    log(data, actor, {
+      kind: "CREATED",
+      entityType: "idea",
+      entityId: created[0].id,
+      summary:
+        created.length === 1
+          ? `Новая идея: ${created[0].title}`
+          : `Добавлено идей: ${created.length}`,
+    });
+    return created;
+  });
+}
+
+export async function updateIdea(
+  ideaId: string,
+  patch: Partial<Pick<Idea, "title" | "description" | "category" | "effort" | "impact" | "notes" | "favorite">> & {
+    steps?: IdeaStep[];
+  },
+) {
+  const actor = await requirePermission("idea.write");
+  return mutateCrm((data) => {
+    const idea = (data.ideas ?? []).find((i) => i.id === ideaId && !i.deletedAt);
+    if (!idea) throw new Error("Идея не найдена.");
+    if (patch.title !== undefined) {
+      if (!patch.title.trim()) throw new Error("У идеи должно быть название.");
+      idea.title = patch.title.trim().slice(0, 140);
+    }
+    if (patch.description !== undefined) idea.description = patch.description.trim().slice(0, 2000);
+    if (patch.category) idea.category = patch.category;
+    if (patch.effort) idea.effort = patch.effort;
+    if (patch.impact) idea.impact = patch.impact;
+    if (patch.notes !== undefined) idea.notes = patch.notes.trim().slice(0, 4000) || undefined;
+    if (patch.favorite !== undefined) idea.favorite = patch.favorite || undefined;
+    if (patch.steps) {
+      idea.steps = patch.steps
+        .filter((st) => st.text.trim())
+        .slice(0, 12)
+        .map((st) => ({ id: st.id || id(), text: st.text.trim().slice(0, 200), done: Boolean(st.done) }));
+    }
+    idea.updatedAt = now();
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "idea",
+      entityId: idea.id,
+      summary: `Идея обновлена: ${idea.title}`,
+    });
+    return idea;
+  });
+}
+
+export async function setIdeaStatus(ideaId: string, status: IdeaStatus) {
+  const actor = await requirePermission("idea.write");
+  return mutateCrm((data) => {
+    const idea = (data.ideas ?? []).find((i) => i.id === ideaId && !i.deletedAt);
+    if (!idea) throw new Error("Идея не найдена.");
+    const previous = idea.status;
+    if (previous === status) return idea;
+    idea.status = status;
+    idea.updatedAt = now();
+    log(data, actor, {
+      kind: "STATUS_CHANGE",
+      entityType: "idea",
+      entityId: idea.id,
+      summary: `Идея «${idea.title}»: ${previous} → ${status}`,
+      from: previous,
+      to: status,
+    });
+    return idea;
+  });
+}
+
+export async function deleteIdea(ideaId: string) {
+  const actor = await requirePermission("idea.delete");
+  return mutateCrm((data) => {
+    const idea = (data.ideas ?? []).find((i) => i.id === ideaId && !i.deletedAt);
+    if (!idea) return false;
+    idea.deletedAt = now();
+    log(data, actor, {
+      kind: "UPDATED",
+      entityType: "idea",
+      entityId: idea.id,
+      summary: `Идея удалена: ${idea.title}`,
+    });
+    return true;
+  });
+}
+
+/** Aggregate, non-personal facts the generator may use: which niches the studio works with. */
+export async function ideaContext(): Promise<{ niches: string[]; clients: number; openLeads: number }> {
+  await requirePermission("idea.write");
+  const data = await readCrm();
+  const count = new Map<string, number>();
+  for (const lead of alive(data.leads)) {
+    const service = lead.service?.trim();
+    if (service) count.set(service.toLowerCase(), (count.get(service.toLowerCase()) ?? 0) + 1);
+  }
+  return {
+    niches: [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k),
+    clients: alive(data.clients).length,
+    openLeads: alive(data.leads).filter((l) => !["WON", "LOST", "NOT_NOW"].includes(l.stage)).length,
+  };
 }

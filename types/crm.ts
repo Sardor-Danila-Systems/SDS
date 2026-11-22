@@ -145,6 +145,23 @@ export const CLIENT_PROJECT_STATUSES = [
 ] as const;
 export type ClientProjectStatus = (typeof CLIENT_PROJECT_STATUSES)[number];
 
+export const IDEA_STATUSES = ["NEW", "DEVELOPING", "DONE", "ARCHIVED"] as const;
+export type IdeaStatus = (typeof IDEA_STATUSES)[number];
+
+export const IDEA_CATEGORIES = [
+  "SALES",
+  "MARKETING",
+  "PRODUCT",
+  "CLIENTS",
+  "TEAM",
+  "PROCESS",
+  "PARTNERS",
+] as const;
+export type IdeaCategory = (typeof IDEA_CATEGORIES)[number];
+
+export const IDEA_LEVELS = ["LOW", "MEDIUM", "HIGH"] as const;
+export type IdeaLevel = (typeof IDEA_LEVELS)[number];
+
 /** What an activity is attached to. */
 export type EntityType =
   | "lead"
@@ -153,6 +170,7 @@ export type EntityType =
   | "project"
   | "task"
   | "expense"
+  | "idea"
   | "user";
 
 export interface User {
@@ -488,6 +506,35 @@ export interface Activity {
   createdAt: string;
 }
 
+export interface IdeaStep {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
+/** A thing the studio could try: a strategy, an offer, an experiment. */
+export interface Idea {
+  id: string;
+  title: string;
+  description: string;
+  category: IdeaCategory;
+  /** How much work it is to try. */
+  effort: IdeaLevel;
+  /** How much it could change if it works. */
+  impact: IdeaLevel;
+  status: IdeaStatus;
+  favorite?: boolean;
+  /** Where it came from: the built-in generator, the AI, or a person. */
+  source: "generator" | "ai" | "manual";
+  steps: IdeaStep[];
+  notes?: string;
+  createdById?: string;
+  createdByName?: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
 /** The whole CRM, as persisted. One document keeps writes atomic. */
 export interface CrmData {
   version: number;
@@ -502,6 +549,7 @@ export interface CrmData {
   expenses: Expense[];
   standups: Standup[];
   standupSchedule?: StandupSchedule;
+  ideas: Idea[];
   activities: Activity[];
 }
 
@@ -517,5 +565,6 @@ export const emptyCrmData: CrmData = {
   proposals: [],
   expenses: [],
   standups: [],
+  ideas: [],
   activities: [],
 };

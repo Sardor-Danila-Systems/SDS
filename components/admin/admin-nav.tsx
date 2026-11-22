@@ -12,6 +12,7 @@ import {
   FolderKanban,
   Activity,
   Globe,
+  Lightbulb,
   LayoutDashboard,
   Menu,
   PieChart,
@@ -64,6 +65,7 @@ const GROUPS: NavGroup[] = [
       { href: "/admin/crm/pipeline", label: "Воронка", icon: Columns3 },
       { href: "/admin/crm/meetings", label: "Встречи", icon: CalendarDays },
       { href: "/admin/crm/prospects", label: "Кому написать", icon: Send },
+      { href: "/admin/ideas", label: "Идеи", icon: Lightbulb },
     ],
   },
   {

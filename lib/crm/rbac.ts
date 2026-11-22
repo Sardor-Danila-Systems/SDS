@@ -26,6 +26,8 @@ export const PERMISSIONS = [
   "team.view",
   "standup.manage",
   "content.write",
+  "idea.write",
+  "idea.delete",
   "users.manage",
 ] as const;
 
@@ -43,11 +45,12 @@ const BY_ROLE: Record<Role, Permission[]> = {
     "client.write",
     "task.write",
     "meeting.write",
+    "idea.write",
     "finance.view",
   ],
 
   // Developers see the work assigned to them, not the commercials.
-  DEVELOPER: ["crm.view", "task.write", "project.write"],
+  DEVELOPER: ["crm.view", "task.write", "project.write", "idea.write"],
 };
 
 export function can(role: Role, permission: Permission): boolean {

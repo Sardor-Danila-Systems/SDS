@@ -125,6 +125,18 @@ export const TABLES: TableSpec[] = [
     indexes: [["date"]],
   },
   {
+    prop: "ideas",
+    table: "crm_ideas",
+    fields: [
+      ...t("title", "description", "category", "effort", "impact", "status"),
+      ...b("favorite"),
+      ...t("source"),
+      ...j("steps"),
+      ...t("notes", "createdById", "createdByName", "createdAt", "updatedAt", "deletedAt"),
+    ],
+    indexes: [["status"]],
+  },
+  {
     prop: "activities",
     table: "crm_activities",
     fields: [
